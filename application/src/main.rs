@@ -1,3 +1,5 @@
+use engine;
+
 fn main() {
-    println!("Hello, world!");
+    engine::log::log("Hello, world!");
 }
