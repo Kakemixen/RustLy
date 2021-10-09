@@ -3,12 +3,19 @@
 version = 3
 
 [[package]]
-name = "application"
+name = "ly_log"
+version = "0.1.0"
+
+[[package]]
+name = "rustly"
 version = "0.1.0"
 dependencies = [
- "engine",
+ "ly_log",
 ]
 
 [[package]]
-name = "engine"
+name = "test"
 version = "0.1.0"
+dependencies = [
+ "rustly",
+]

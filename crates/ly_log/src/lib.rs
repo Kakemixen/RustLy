@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! error 
+macro_rules! error
 {
     () => { };
     ($($x : tt) *) => { println!(
@@ -13,7 +13,7 @@ macro_rules! error
 
 #[cfg(feature = "warning")]
 #[macro_export]
-macro_rules! warning 
+macro_rules! warning
 {
     () => { };
     ($($x : tt) *) => { println!(
@@ -31,7 +31,7 @@ macro_rules! warning { ($($x : tt) *) => { } }
 
 #[cfg(feature = "info")]
 #[macro_export]
-macro_rules! info 
+macro_rules! info
 {
     () => { };
     ($($x : tt) *) => { println!(
@@ -50,7 +50,7 @@ macro_rules! info { ($($x : tt) *) => { } }
 
 #[cfg(feature = "debug")]
 #[macro_export]
-macro_rules! debug 
+macro_rules! debug
 {
     () => { };
     ($($x : tt) *) => { println!(
@@ -65,3 +65,11 @@ macro_rules! debug
 #[cfg(not(feature = "debug"))]
 #[macro_export]
 macro_rules! debug { ($($x : tt) *) => { } }
+
+pub fn test_log()
+{
+    error!("test {}", 2);
+    warning!("test {}", 2);
+    info!("test {}", 2);
+    debug!("test {}", 2);
+}

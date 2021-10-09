@@ -1,6 +1,13 @@
-[workspace]
+[package]
+name = "rustly"
+version = "0.1.0"
+edition = "2018"
 
+[workspace]
 members = [
-	"engine",
-	"application",
+	"crates/*",
+	"examples/*",
 ]
+
+[dependencies]
+ly_log = { path = "crates/ly_log" }
