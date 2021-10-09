@@ -1,1 +1,4 @@
-pub use ly_log;
+pub mod log
+{
+    pub use ly_log::*;
+}
