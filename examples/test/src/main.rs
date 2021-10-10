@@ -7,5 +7,5 @@ fn main()
     info!("hello {}", 2);
     debug!("hello {}", 2);
     trace!("hello {}", 2);
-    test_log();
+    rustly::test_log();
 }
