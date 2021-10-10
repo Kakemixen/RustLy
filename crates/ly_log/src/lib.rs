@@ -8,7 +8,7 @@ use thread_local::ThreadLocal;
 
 pub mod prelude
 {
-    pub use super::{error, warning, info, debug, trace, init};
+    pub use super::{error, warning, info, debug, trace, log_init};
 }
 
 pub mod core_prelude
@@ -86,7 +86,7 @@ fn init_channel() -> LogSender
     tx
 }
 
-pub fn init()
+pub fn log_init()
 {
     static INITIALIZED: AtomicBool = AtomicBool::new(false);
     if INITIALIZED.load(Ordering::Relaxed) {
