@@ -25,53 +25,42 @@ pub enum LogLevel
     Trace
 }
 
+struct LogEvent
+{
+    level: LogLevel,
+    in_core: bool,
+    file: &'static str,
+    line: u32,
+    message: String,
+}
+
 enum LogEnum
 {
-    Msg(String),
+    Msg(LogEvent),
     Kill(String)
 }
 
-#[doc(hidden)]
-pub fn __private_log(
-    core: bool,
-    level: LogLevel,
-    file: &'static str,
-    line: u32,
-    args: fmt::Arguments,
-) {
-    let levelstr = match level {
+fn print_log_event(event: LogEvent)
+{
+    let levelstr = match event.level {
         LogLevel::Error   => "ERROR".red(),
         LogLevel::Warning => "WARNING".yellow(),
         LogLevel::Info    => "INFO".green(),
         LogLevel::Debug   => "DEBUG".blue(),
         LogLevel::Trace   => "TRACE".truecolor(80, 80, 80),
     };
-    let corestr = match core {
+    let corestr = match event.in_core {
         true => " LY".magenta(),
         false => "".normal(),
     };
 
-    unsafe {
-        LOGGER.log(format_args!("[{:7}{}] {}:{} {}",
-                 levelstr, corestr,
-                 file, line,
-                 args));
-    }
+    println!("{}", 
+        format!("[{:7}{}] {}:{} - {}",
+            levelstr, corestr, event.file, event.line, event.message
+        )
+    );
 }
 
-trait Log: Sync
-{
-    fn log(&self, args: fmt::Arguments);
-}
-
-struct EmptyLogger;
-
-impl Log for EmptyLogger
-{
-    fn log(&self, _args: fmt::Arguments) { }
-}
-
-static mut LOGGER: &dyn Log = &EmptyLogger;
 
 type LogSender = mpsc::SyncSender<LogEnum>;
 fn init_channel() -> LogSender
@@ -84,10 +73,11 @@ fn init_channel() -> LogSender
             let rx = rx;
             for line in &rx {
                 match line {
-                    LogEnum::Msg(msg) => println!("{}", msg),
+                    LogEnum::Msg(event) => {
+                        print_log_event(event);
+                    },
                     LogEnum::Kill(msg) => {
                         println!("{}: {}", "Logging abort reason".red(), msg);
-                        //panic!("Recieved Kill Command");
                         std::process::abort();
                     },
                 };
@@ -112,6 +102,41 @@ pub fn init()
     }
 }
 
+#[doc(hidden)]
+pub fn __private_log(
+    core: bool,
+    level: LogLevel,
+    file: &'static str,
+    line: u32,
+    args: fmt::Arguments,
+) {
+    let event = LogEvent {
+        level: level,
+        in_core: core,
+        file: file,
+        line: line,
+        message: format!("{}", args),
+    };
+
+    unsafe {
+        LOGGER.log(event);
+    }
+}
+
+trait Log: Sync
+{
+    fn log(&self, event: LogEvent);
+}
+
+struct EmptyLogger;
+
+impl Log for EmptyLogger
+{
+    fn log(&self, event: LogEvent) { }
+}
+
+static mut LOGGER: &dyn Log = &EmptyLogger;
+
 struct Logger
 {
     transmitter: ThreadLocal<LogSender>,
@@ -132,10 +157,10 @@ impl Logger
 
 impl Log for Logger
 {
-    fn log(&self, args: fmt::Arguments)
+    fn log(&self, event: LogEvent)
     {
         let tx = self.transmitter.get_or(|| self.tx_main.clone());
-        if let Err(e) = tx.try_send(LogEnum::Msg(format!("{}", args))) {
+        if let Err(e) = tx.try_send(LogEnum::Msg(event)) {
             match e {
                 mpsc::TrySendError::Full(_) => {
                     tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
