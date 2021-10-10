@@ -1,14 +1,40 @@
 pub use colored::Colorize;
+use std::fmt;
+
+pub enum LogLevel
+{
+    Error,
+    Warning,
+    Info,
+    Debug,
+    Trace
+}
+
+#[doc(hidden)]
+pub fn __private_log(
+    level: LogLevel,
+    args: fmt::Arguments,
+) {
+    let levelstr = match level {
+        LogLevel::Error   => "ERROR".red(),
+        LogLevel::Warning => "WARNING".yellow(),
+        LogLevel::Info    => "INFO".green(),
+        LogLevel::Debug   => "DEBUG".blue(),
+        LogLevel::Trace   => "TRACE".truecolor(80, 80, 80),
+    };
+    println!("[{:7}] {}:{} {}",
+             levelstr,
+             file!(), line!(),
+             args);
+}
 
 #[macro_export]
 macro_rules! error
 {
     () => { };
-    ($($x : tt) *) => { println!(
-            "[{:7}] {}:{} {}",
-            "ERROR".red(),
-            file!(), line!(),
-            format!(
+    ($($x : tt) *) => { __private_log(
+            LogLevel::Error,
+            format_args!(
                 $($x) *
                 )
             ) };
@@ -19,11 +45,9 @@ macro_rules! error
 macro_rules! warning
 {
     () => { };
-    ($($x : tt) *) => { println!(
-            "[{:7}] {}:{} {}",
-            "WARNING".yellow(),
-            file!(), line!(),
-            format!(
+    ($($x : tt) *) => { __private_log(
+            LogLevel::Warning,
+            format_args!(
                 $($x) *
                 )
             ) };
@@ -38,11 +62,9 @@ macro_rules! warning { ($($x : tt) *) => { } }
 macro_rules! info
 {
     () => { };
-    ($($x : tt) *) => { println!(
-            "[{:7}] {}:{} {}",
-            "INFO".green(),
-            file!(), line!(),
-            format!(
+    ($($x : tt) *) => { __private_log(
+            LogLevel::Info,
+            format_args!(
                 $($x) *
                 )
             ) };
@@ -58,11 +80,9 @@ macro_rules! info { ($($x : tt) *) => { } }
 macro_rules! debug
 {
     () => { };
-    ($($x : tt) *) => { println!(
-            "[{:7}] {}:{} {}",
-            "DEBUG".blue(),
-            file!(), line!(),
-            format!(
+    ($($x : tt) *) => { __private_log(
+            LogLevel::Debug,
+            format_args!(
                 $($x) *
                 )
             ) };
@@ -72,11 +92,29 @@ macro_rules! debug
 #[macro_export]
 macro_rules! debug { ($($x : tt) *) => { } }
 
+#[cfg(feature = "trace")]
+#[macro_export]
+macro_rules! trace
+{
+    () => { };
+    ($($x : tt) *) => { __private_log(
+            LogLevel::Trace,
+            format_args!(
+                $($x) *
+                )
+            ) };
+}
+
+#[cfg(not(feature = "trace"))]
+#[macro_export]
+macro_rules! trace { ($($x : tt) *) => { } }
+
 pub fn test_log()
 {
     error!("test {}", 2);
     warning!("test {}", 2);
     info!("test {}", 2);
     debug!("test {}", 2);
+    trace!("test {}", 2);
 }
 
