@@ -25,6 +25,12 @@ pub enum LogLevel
     Trace
 }
 
+enum LogEnum
+{
+    Msg(String),
+    Kill(String)
+}
+
 #[doc(hidden)]
 pub fn __private_log(
     core: bool,
@@ -67,15 +73,26 @@ impl Log for EmptyLogger
 
 static mut LOGGER: &dyn Log = &EmptyLogger;
 
-fn init_channel() -> mpsc::SyncSender<String>
+type LogSender = mpsc::SyncSender<LogEnum>;
+fn init_channel() -> LogSender
 {
     let (tx, rx) = mpsc::sync_channel(5);
 
-    thread::spawn(move || {
-        for line in rx {
-            println!("{}", line);
-        }
-    });
+    thread::Builder::new()
+        .name("LogThread".to_string())
+        .spawn(move || {
+            let rx = rx;
+            for line in &rx {
+                match line {
+                    LogEnum::Msg(msg) => println!("{}", msg),
+                    LogEnum::Kill(msg) => {
+                        println!("{}: {}", "Logging abort reason".red(), msg);
+                        //panic!("Recieved Kill Command");
+                        std::process::abort();
+                    },
+                };
+            }
+        }).unwrap();
     tx
 }
 
@@ -97,13 +114,13 @@ pub fn init()
 
 struct Logger
 {
-    transmitter: ThreadLocal<mpsc::SyncSender<String>>,
-    tx_main: mpsc::SyncSender<String>,
+    transmitter: ThreadLocal<LogSender>,
+    tx_main: LogSender,
 }
 
 impl Logger
 {
-    fn new(tx: mpsc::SyncSender<String>) -> Self
+    fn new(tx: LogSender) -> Self
     {
         let logger = Logger {
             transmitter: ThreadLocal::new(),
@@ -118,7 +135,16 @@ impl Log for Logger
     fn log(&self, args: fmt::Arguments)
     {
         let tx = self.transmitter.get_or(|| self.tx_main.clone());
-        tx.send(format!("{}", args));
+        if let Err(e) = tx.try_send(LogEnum::Msg(format!("{}", args))) {
+            match e {
+                mpsc::TrySendError::Full(_) => {
+                    tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
+                },
+                mpsc::TrySendError::Disconnected(_) => {
+                    panic!("Disconnected logger, can't send logs");
+                },
+            };
+        }
     }
 }
 
