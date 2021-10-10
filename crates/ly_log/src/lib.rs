@@ -3,14 +3,12 @@ use std::fmt;
 
 pub mod prelude
 {
-    pub use super::{LogLevel, __private_log,
-        error, warning, info, debug, trace};
+    pub use super::{error, warning, info, debug, trace};
 }
 
 pub mod core_prelude
 {
-    pub use super::{LogLevel, __private_log, core_error,
-        core_warning, core_info, core_debug, core_trace};
+    pub use super::{core_error, core_warning, core_info, core_debug, core_trace};
 }
 
 pub enum LogLevel
@@ -49,9 +47,9 @@ pub fn __private_log(
 macro_rules! error
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             false,
-            LogLevel::Error,
+            $crate::LogLevel::Error,
             format_args!(
                 $($x) *
                 )
@@ -63,9 +61,9 @@ macro_rules! error
 macro_rules! warning
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             false,
-            LogLevel::Warning,
+            $crate::LogLevel::Warning,
             format_args!(
                 $($x) *
                 )
@@ -81,9 +79,9 @@ macro_rules! warning { ($($x : tt) *) => { } }
 macro_rules! info
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             false,
-            LogLevel::Info,
+            $crate::LogLevel::Info,
             format_args!(
                 $($x) *
                 )
@@ -100,9 +98,9 @@ macro_rules! info { ($($x : tt) *) => { } }
 macro_rules! debug
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             false,
-            LogLevel::Debug,
+            $crate::LogLevel::Debug,
             format_args!(
                 $($x) *
                 )
@@ -118,9 +116,9 @@ macro_rules! debug { ($($x : tt) *) => { } }
 macro_rules! trace
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             false,
-            LogLevel::Trace,
+            $crate::LogLevel::Trace,
             format_args!(
                 $($x) *
                 )
@@ -135,9 +133,9 @@ macro_rules! trace { ($($x : tt) *) => { } }
 macro_rules! core_error
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             true,
-            LogLevel::Error,
+            $crate::LogLevel::Error,
             format_args!(
                 $($x) *
                 )
@@ -149,9 +147,9 @@ macro_rules! core_error
 macro_rules! core_warning
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             true,
-            LogLevel::Warning,
+            $crate::LogLevel::Warning,
             format_args!(
                 $($x) *
                 )
@@ -167,9 +165,9 @@ macro_rules! core_warning { ($($x : tt) *) => { } }
 macro_rules! core_info
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             true,
-            LogLevel::Info,
+            $crate::LogLevel::Info,
             format_args!(
                 $($x) *
                 )
@@ -185,9 +183,9 @@ macro_rules! core_info { ($($x : tt) *) => { } }
 macro_rules! core_debug
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             true,
-            LogLevel::Debug,
+            $crate::LogLevel::Debug,
             format_args!(
                 $($x) *
                 )
@@ -203,9 +201,9 @@ macro_rules! core_debug { ($($x : tt) *) => { } }
 macro_rules! core_trace
 {
     () => { };
-    ($($x : tt) *) => { __private_log(
+    ($($x : tt) *) => { $crate::__private_log(
             true,
-            LogLevel::Trace,
+            $crate::LogLevel::Trace,
             format_args!(
                 $($x) *
                 )
