@@ -191,7 +191,7 @@ macro_rules! error
             ) };
 }
 
-#[cfg(feature = "warning")]
+#[cfg(not(feature = "strip_warning"))]
 #[macro_export]
 macro_rules! warning
 {
@@ -206,11 +206,11 @@ macro_rules! warning
             ) };
 }
 
-#[cfg(not(feature = "warning"))]
+#[cfg(feature = "strip_warning")]
 #[macro_export]
 macro_rules! warning { ($($x : tt) *) => { } }
 
-#[cfg(feature = "info")]
+#[cfg(not(feature = "strip_info"))]
 #[macro_export]
 macro_rules! info
 {
@@ -225,12 +225,12 @@ macro_rules! info
             ) };
 }
 
-#[cfg(not(feature = "info"))]
+#[cfg(feature = "strip_info")]
 #[macro_export]
 macro_rules! info { ($($x : tt) *) => { } }
 
 
-#[cfg(feature = "debug")]
+#[cfg(not(feature = "strip_debug"))]
 #[macro_export]
 macro_rules! debug
 {
@@ -245,11 +245,11 @@ macro_rules! debug
             ) };
 }
 
-#[cfg(not(feature = "debug"))]
+#[cfg(feature = "strip_debug")]
 #[macro_export]
 macro_rules! debug { ($($x : tt) *) => { } }
 
-#[cfg(feature = "trace")]
+#[cfg(not(feature = "strip_trace"))]
 #[macro_export]
 macro_rules! trace
 {
@@ -264,7 +264,7 @@ macro_rules! trace
             ) };
 }
 
-#[cfg(not(feature = "trace"))]
+#[cfg(feature = "strip_trace")]
 #[macro_export]
 macro_rules! trace { ($($x : tt) *) => { } }
 
@@ -282,7 +282,7 @@ macro_rules! core_error
             ) };
 }
 
-#[cfg(feature = "warning")]
+#[cfg(not(feature = "strip_warning"))]
 #[macro_export]
 macro_rules! core_warning
 {
@@ -297,11 +297,11 @@ macro_rules! core_warning
             ) };
 }
 
-#[cfg(not(feature = "warning"))]
+#[cfg(feature = "strip_warning")]
 #[macro_export]
 macro_rules! core_warning { ($($x : tt) *) => { } }
 
-#[cfg(feature = "info")]
+#[cfg(not(feature = "strip_info"))]
 #[macro_export]
 macro_rules! core_info
 {
@@ -316,11 +316,11 @@ macro_rules! core_info
             ) };
 }
 
-#[cfg(not(feature = "info"))]
+#[cfg(feature = "strip_info")]
 #[macro_export]
 macro_rules! core_info { ($($x : tt) *) => { } }
 
-#[cfg(feature = "debug")]
+#[cfg(not(feature = "strip_debug"))]
 #[macro_export]
 macro_rules! core_debug
 {
@@ -335,11 +335,11 @@ macro_rules! core_debug
             ) };
 }
 
-#[cfg(not(feature = "debug"))]
+#[cfg(feature = "strip_debug")]
 #[macro_export]
 macro_rules! core_debug { ($($x : tt) *) => { } }
 
-#[cfg(feature = "trace")]
+#[cfg(not(feature = "strip_trace"))]
 #[macro_export]
 macro_rules! core_trace
 {
@@ -354,6 +354,6 @@ macro_rules! core_trace
             ) };
 }
 
-#[cfg(not(feature = "trace"))]
+#[cfg(feature = "strip_trace")]
 #[macro_export]
 macro_rules! core_trace { ($($x : tt) *) => { } }

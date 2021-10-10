@@ -10,8 +10,8 @@ colored = "2.0.0"
 thread_local = "1.1.3"
 
 [features]
-default = ["warning"]
-warning = []
-info = ["warning"]
-debug = ["info"]
-trace = ["debug"]
+default = []
+strip_trace = []
+strip_debug = ["strip_trace"]
+strip_info = ["strip_debug"]
+strip_warning = ["strip_info"]
