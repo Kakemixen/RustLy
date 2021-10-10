@@ -1,10 +1,10 @@
-use rustly::log;
+use rustly::log::*;
 
 fn main()
 {
-    log::error!("hello {}", 2);
-    log::warning!("hello {}", 2);
-    log::info!("hello {}", 2);
-    log::debug!("hello {}", 2);
-    log::test_log();
+    error!("hello {}", 2);
+    warning!("hello {}", 2);
+    info!("hello {}", 2);
+    debug!("hello {}", 2);
+    test_log();
 }

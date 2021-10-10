@@ -1,9 +1,12 @@
+pub use colored::Colorize;
+
 #[macro_export]
 macro_rules! error
 {
     () => { };
     ($($x : tt) *) => { println!(
-            "[ERROR] {}:{} {}",
+            "[{:7}] {}:{} {}",
+            "ERROR".red(),
             file!(), line!(),
             format!(
                 $($x) *
@@ -17,7 +20,8 @@ macro_rules! warning
 {
     () => { };
     ($($x : tt) *) => { println!(
-            "[WARNING] {}:{} {}",
+            "[{:7}] {}:{} {}",
+            "WARNING".yellow(),
             file!(), line!(),
             format!(
                 $($x) *
@@ -35,7 +39,8 @@ macro_rules! info
 {
     () => { };
     ($($x : tt) *) => { println!(
-            "[INFO] {}:{} {}",
+            "[{:7}] {}:{} {}",
+            "INFO".green(),
             file!(), line!(),
             format!(
                 $($x) *
@@ -54,7 +59,8 @@ macro_rules! debug
 {
     () => { };
     ($($x : tt) *) => { println!(
-            "[DEBUG] {}:{} {}",
+            "[{:7}] {}:{} {}",
+            "DEBUG".blue(),
             file!(), line!(),
             format!(
                 $($x) *
@@ -73,3 +79,4 @@ pub fn test_log()
     info!("test {}", 2);
     debug!("test {}", 2);
 }
+
