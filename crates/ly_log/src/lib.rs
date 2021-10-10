@@ -54,9 +54,10 @@ fn print_log_event(event: LogEvent)
         false => "".normal(),
     };
 
-    println!("{}", 
+    println!("{}",
         format!("[{:7}{}] {}:{} - {}",
-            levelstr, corestr, event.file, event.line, event.message
+            levelstr, corestr, event.file, event.line,
+            event.message.replace("\n", "\n[   -   ] ")
         )
     );
 }
@@ -70,8 +71,7 @@ fn init_channel() -> LogSender
     thread::Builder::new()
         .name("LogThread".to_string())
         .spawn(move || {
-            let rx = rx;
-            for line in &rx {
+            for line in rx {
                 match line {
                     LogEnum::Msg(event) => {
                         print_log_event(event);
@@ -132,7 +132,7 @@ struct EmptyLogger;
 
 impl Log for EmptyLogger
 {
-    fn log(&self, event: LogEvent) { }
+    fn log(&self, _event: LogEvent) { }
 }
 
 static mut LOGGER: &dyn Log = &EmptyLogger;
