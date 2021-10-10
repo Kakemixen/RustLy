@@ -2,6 +2,7 @@ use rustly::log::*;
 
 fn main()
 {
+    init();
     error!("hello {}", 2);
     warning!("hello {}", 2);
     info!("hello {}", 2);

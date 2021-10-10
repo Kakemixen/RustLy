@@ -1,10 +1,14 @@
 pub use colored::Colorize;
 use std::fmt;
-use std::sync::mpsc;
+use std::sync::{mpsc,
+    atomic::{AtomicBool, Ordering}
+};
+use std::thread;
+use thread_local::ThreadLocal;
 
 pub mod prelude
 {
-    pub use super::{error, warning, info, debug, trace};
+    pub use super::{error, warning, info, debug, trace, init};
 }
 
 pub mod core_prelude
@@ -40,11 +44,87 @@ pub fn __private_log(
         true => " LY".magenta(),
         false => "".normal(),
     };
-    println!("[{:7}{}] {}:{} {}",
-             levelstr, corestr,
-             file, line,
-             args);
+
+    unsafe {
+        LOGGER.log(format_args!("[{:7}{}] {}:{} {}",
+                 levelstr, corestr,
+                 file, line,
+                 args));
+    }
 }
+
+trait Log: Sync
+{
+    fn log(&self, args: fmt::Arguments);
+}
+
+struct EmptyLogger;
+
+impl Log for EmptyLogger
+{
+    fn log(&self, _args: fmt::Arguments) { }
+}
+
+static mut LOGGER: &dyn Log = &EmptyLogger;
+
+fn init_channel() -> mpsc::SyncSender<String>
+{
+    let (tx, rx) = mpsc::sync_channel(5);
+
+    thread::spawn(move || {
+        for line in rx {
+            println!("{}", line);
+        }
+    });
+    tx
+}
+
+pub fn init()
+{
+    static INITIALIZED: AtomicBool = AtomicBool::new(false);
+    if INITIALIZED.load(Ordering::Relaxed) {
+        panic!("Cannot initialize log multiple times");
+    }
+    INITIALIZED.store(true, Ordering::Relaxed);
+
+    let tx = init_channel();
+    let logger_box = Box::new(Logger::new(tx));
+
+    unsafe {
+        LOGGER = Box::leak(logger_box);
+    }
+}
+
+struct Logger
+{
+    transmitter: ThreadLocal<mpsc::SyncSender<String>>,
+    tx_main: mpsc::SyncSender<String>,
+}
+
+impl Logger
+{
+    fn new(tx: mpsc::SyncSender<String>) -> Self
+    {
+        let logger = Logger {
+            transmitter: ThreadLocal::new(),
+            tx_main: tx,
+        };
+        logger
+    }
+}
+
+impl Log for Logger
+{
+    fn log(&self, args: fmt::Arguments)
+    {
+        let tx = self.transmitter.get_or(|| self.tx_main.clone());
+        tx.send(format!("{}", args));
+    }
+}
+
+
+
+// macros
 
 #[macro_export]
 macro_rules! error
