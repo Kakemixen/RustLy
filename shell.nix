@@ -5,21 +5,23 @@
 
 pkgs.mkShell {
   buildInputs = [
-    nixgl.nixVulkanNvidia
 
-    pkgs.rustc
-    pkgs.cargo
-    pkgs.glslang
-    pkgs.vulkan-headers
-    pkgs.vulkan-loader
-    pkgs.vulkan-validation-layers
-    pkgs.vulkan-tools
+	pkgs.rustc
+	pkgs.cargo
+	pkgs.glslang
+	pkgs.vulkan-headers
+	pkgs.vulkan-loader
+	pkgs.vulkan-validation-layers
+	pkgs.vulkan-tools
 
-    pkgs.xorg.libX11
-    pkgs.xorg.libXau
-    pkgs.xorg.libXdmcp
+	pkgs.xorg.libX11
+	pkgs.xorg.libXau
+	pkgs.xorg.libXdmcp
 
-    pkgs.gdb
+	pkgs.gdb
+	pkgs.rust-analyzer
+	pkgs.rustfmt
+	nixgl.nixVulkanNvidia
   ];
 
   VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
