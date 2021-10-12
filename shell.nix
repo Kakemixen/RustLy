@@ -1,29 +1,37 @@
-{
-    nixgl ? import (fetchTarball "https://github.com/guibou/nixGL/archive/804f1989b3f0bb3347c02ce136060e29f9fc3340.tar.gz") {},
-    pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/dd98b100651cfbb8804f32d852f75ef7c97a6b74.tar.gz") {}
-}:
-
+let
+	nixgl   = import (fetchTarball "https://github.com/guibou/nixGL/archive/804f1989b3f0bb3347c02ce136060e29f9fc3340.tar.gz") {};
+	rustOverlay = import (fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
+	pkgs    = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/93ca5ab64f78ce778c0bcecf9458263f0f6289b6.tar.gz") {
+		overlays = [ rustOverlay ];
+	};
+	rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+		extensions = [
+			"rust-src"
+			"rustfmt-preview"
+			"rust-analyzer-preview"
+		];
+	});
+in
 pkgs.mkShell {
-  buildInputs = [
+	buildInputs = [
+		rust
+		pkgs.glslang
+		pkgs.vulkan-headers
+		pkgs.vulkan-loader
+		pkgs.vulkan-validation-layers
+		pkgs.vulkan-tools
 
-	pkgs.rustc
-	pkgs.cargo
-	pkgs.glslang
-	pkgs.vulkan-headers
-	pkgs.vulkan-loader
-	pkgs.vulkan-validation-layers
-	pkgs.vulkan-tools
+		pkgs.xorg.libX11
+		pkgs.xorg.libXau
+		pkgs.xorg.libXdmcp
 
-	pkgs.xorg.libX11
-	pkgs.xorg.libXau
-	pkgs.xorg.libXdmcp
+		pkgs.which
+		pkgs.gdb
+		#nixgl.nixVulkanNvidia
+	];
 
-	pkgs.gdb
-	pkgs.rust-analyzer
-	pkgs.rustfmt
-	nixgl.nixVulkanNvidia
-  ];
-
-  VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
-  LD_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
+	VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
+	LD_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
+	RUST_BACKTRACE = 1;
+	CFG_RELEASE_CHANNEL = "nightly";
 }
