@@ -1,9 +1,7 @@
 pub use colored::Colorize;
+use crossbeam::channel;
 use std::fmt;
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	mpsc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use thread_local::ThreadLocal;
 
@@ -68,10 +66,10 @@ fn print_log_event(event: LogEvent)
 	);
 }
 
-type LogSender = mpsc::SyncSender<LogEnum>;
+type LogSender = channel::Sender<LogEnum>;
 fn init_channel() -> LogSender
 {
-	let (tx, rx) = mpsc::sync_channel(5);
+	let (tx, rx) = channel::bounded(5);
 
 	thread::Builder::new()
 		.name("LogThread".to_string())
@@ -169,10 +167,10 @@ impl Log for Logger
 		let tx = self.transmitter.get_or(|| self.tx_main.clone());
 		if let Err(e) = tx.try_send(LogEnum::Msg(event)) {
 			match e {
-				mpsc::TrySendError::Full(_) => {
+				channel::TrySendError::Full(_) => {
 					tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
 				}
-				mpsc::TrySendError::Disconnected(_) => {
+				channel::TrySendError::Disconnected(_) => {
 					panic!("Disconnected logger, can't send logs");
 				}
 			};

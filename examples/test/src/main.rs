@@ -1,3 +1,4 @@
+use rustly;
 use rustly::log::*;
 use std::thread;
 
@@ -28,6 +29,8 @@ fn main()
 		debug!("hello \n{}", 2);
 		trace!("hello \n{}", 2);
 	});
+
+	rustly::test_log();
 
 	handle1.join().unwrap();
 	handle2.join().unwrap();
