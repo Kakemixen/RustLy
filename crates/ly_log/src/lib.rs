@@ -69,7 +69,7 @@ fn print_log_event(event: LogEvent)
 type LogSender = channel::Sender<LogEnum>;
 fn init_channel() -> LogSender
 {
-	let (tx, rx) = channel::bounded(5);
+	let (tx, rx) = channel::bounded(20);
 
 	thread::Builder::new()
 		.name("LogThread".to_string())
