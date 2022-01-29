@@ -28,6 +28,7 @@ struct LogEvent
 {
 	level: LogLevel,
 	in_core: bool,
+	blocking: bool,
 	file: &'static str,
 	line: u32,
 	message: String,
@@ -52,16 +53,23 @@ fn print_log_event(event: LogEvent)
 		true => " LY".magenta(),
 		false => "".normal(),
 	};
+	let blockingstr = match event.blocking {
+		true => " B!".red(),
+		false => "".normal(),
+	};
 
 	println!(
 		"{}",
 		format!(
-			"[{:7}{}] {}:{} - {}",
+			"[{:7}{}{}] {}:{} - {}",
 			levelstr,
 			corestr,
+			blockingstr,
 			event.file,
 			event.line,
-			event.message.replace("\n", "\n[   -   ] ")
+			event
+				.message
+				.replace("\n", &format!("\n[   -   {}{}] ", corestr, blockingstr))
 		)
 	);
 }
@@ -69,7 +77,7 @@ fn print_log_event(event: LogEvent)
 type LogSender = channel::Sender<LogEnum>;
 fn init_channel() -> LogSender
 {
-	let (tx, rx) = channel::bounded(20);
+	let (tx, rx) = channel::bounded(6);
 
 	thread::Builder::new()
 		.name("LogThread".to_string())
@@ -121,6 +129,7 @@ pub fn __private_log(
 		file,
 		line,
 		message: format!("{}", args),
+		blocking: false,
 	};
 
 	unsafe {
@@ -167,8 +176,20 @@ impl Log for Logger
 		let tx = self.transmitter.get_or(|| self.tx_main.clone());
 		if let Err(e) = tx.try_send(LogEnum::Msg(event)) {
 			match e {
-				channel::TrySendError::Full(_) => {
+				#[cfg(not(feature = "disallow_blocking"))]
+				channel::TrySendError::Full(LogEnum::Msg(e)) => {
+					let blocking_event = LogEvent {
+						blocking: tx.is_full(),
+						..e
+					};
+					tx.send(LogEnum::Msg(blocking_event));
+				}
+				#[cfg(feature = "disallow_blocking")]
+				channel::TrySendError::Full(LogEnum::Msg(e)) => {
 					tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
+				}
+				channel::TrySendError::Full(LogEnum::Kill(e)) => {
+					tx.send(LogEnum::Kill(e));
 				}
 				channel::TrySendError::Disconnected(_) => {
 					panic!("Disconnected logger, can't send logs");

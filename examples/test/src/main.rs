@@ -35,4 +35,6 @@ fn main()
 	handle1.join().unwrap();
 	handle2.join().unwrap();
 	handle3.join().unwrap();
+
+	thread::sleep_ms(10);
 }
