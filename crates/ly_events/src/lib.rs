@@ -1,123 +1,69 @@
-// implementation from Ross
-// https://betterprogramming.pub/rust-events-revisited-926486721e3f
-//
-// There is a major problem with this implementation
-// I cannot pass a closure as the callback, a result of the fn(type) (function
-// pointer). This makes it difficult to affect state outside of the callback
-// function. I would like to have events that let me update some state, which is
-// difficult now
+use std::marker::PhantomData;
 
-trait Receiver
+// TODO enable several readers on single channel
+// TODO maybe be inspired by bevy and have two event buffers
+// TODO if two buffers, maybe I can use refcell to enable coupling between
+// readers and channel
+
+struct EventChannel<T>
 {
-	type Data;
-	type Transformer;
-
-	fn on_emit(self, data: Self::Data);
+	events: Vec<T>,
 }
 
-trait Signal
+struct EventReader<T>
 {
-	type Data;
-	type RecType: Receiver;
+	dummy_: PhantomData<T>,
+}
 
-	fn emit(&self, data: Self::Data);
-	fn connect(&mut self, rec: <Self::RecType as Receiver>::Transformer) -> Self::RecType;
-	fn disconnect(&mut self, i: usize);
+impl<T> EventChannel<T>
+{
+	fn new() -> EventChannel<T> { EventChannel { events: Vec::new() } }
+
+	fn send(&mut self, e: T) { self.events.push(e); }
+
+	fn flush(&mut self) { self.events.clear(); }
+
+	fn get_reader(&self) -> EventReader<T>
+	{
+		EventReader {
+			dummy_: Default::default(),
+		}
+	}
+}
+
+impl<T> EventReader<T>
+{
+	fn iter<'a>(&self, channel: &'a EventChannel<T>) -> impl Iterator<Item = &'a T>
+	{
+		// TODO would like to find a way to couple reader and channel
+		// A naive reference member had lifetime issues with current setup
+		channel.events.iter()
+	}
 }
 
 #[cfg(test)]
 mod tests
 {
 	use super::*;
-	use std::cell::RefCell;
-	use std::rc::Rc;
 
-	#[derive(Clone)]
-	struct TestEventData
+	#[derive(Debug, PartialEq, Eq)]
+	struct TestEvent
 	{
-		total: Rc<RefCell<i32>>,
-		num: i32,
-	}
-
-	#[derive(Clone, Copy)]
-	struct TestReciever
-	{
-		id: usize,
-		cls: fn(Self, TestEventData),
-	}
-
-	impl TestReciever
-	{
-		fn new(id: usize, cls: fn(TestReciever, TestEventData)) -> Self { Self { id, cls } }
-	}
-
-	impl Receiver for TestReciever
-	{
-		type Data = TestEventData;
-		type Transformer = fn(Self, TestEventData);
-
-		fn on_emit(self, data: Self::Data) { (self.cls)(self, data); }
-	}
-
-	struct TestSignal
-	{
-		next_id: usize,
-		recs: Vec<TestReciever>,
-	}
-
-	impl TestSignal
-	{
-		fn nxt(&mut self) -> usize
-		{
-			self.next_id += 1;
-			self.next_id
-		}
-
-		fn new() -> Self
-		{
-			TestSignal {
-				recs: Vec::new(),
-				next_id: 0,
-			}
-		}
-	}
-
-	impl Signal for TestSignal
-	{
-		type Data = TestEventData;
-		type RecType = TestReciever;
-
-		fn emit(&self, data: Self::Data) { self.recs.iter().for_each(|r| r.on_emit(data.clone())) }
-		fn connect(&mut self, rec: <Self::RecType as Receiver>::Transformer) -> Self::RecType
-		{
-			let i = self.nxt();
-			let r = Self::RecType::new(i, rec);
-			self.recs.push(r);
-			r
-		}
-		fn disconnect(&mut self, i: usize)
-		{
-			let idx = self.recs.iter().position(|r| r.id == i).unwrap();
-			self.recs.remove(idx);
-		}
+		data: usize,
 	}
 
 	#[test]
 	fn flow()
 	{
-		let total = Rc::new(RefCell::new(0));
-		let result = 2 + 2;
-		assert_eq!(result, 4);
-		let mut sig = TestSignal::new();
-		let _rec = sig.connect(|_t, x: TestEventData| {
-			let t = &*x.total;
-			*t.borrow_mut() += x.num;
-		});
-		sig.emit(TestEventData {
-			total: Rc::clone(&total),
-			num: 3,
-		});
-		let tot = *total.borrow();
-		assert_eq!(tot, 3)
+		let mut test_channel = EventChannel::<TestEvent>::new();
+		let event0 = TestEvent { data: 4 };
+		let event1 = TestEvent { data: 2 };
+		let reader = test_channel.get_reader();
+		let events = reader.iter(&test_channel).collect::<Vec<&TestEvent>>();
+		assert_eq!(events, Vec::<&TestEvent>::new());
+		test_channel.send(event0);
+		test_channel.send(event1);
+		let events = reader.iter(&test_channel).collect::<Vec<&TestEvent>>();
+		assert_eq!(events, [&TestEvent { data: 4 }, &TestEvent { data: 2 }]);
 	}
 }
