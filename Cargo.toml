@@ -11,3 +11,4 @@ members = [
 
 [dependencies]
 ly_log = { path = "crates/ly_log" }
+ly_events = { path = "crates/ly_events" }
