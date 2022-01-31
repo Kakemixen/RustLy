@@ -102,13 +102,24 @@ mod tests
 		let mut test_channel = EventChannel::<TestEvent>::new();
 		let event0 = TestEvent { data: 4 };
 		let event1 = TestEvent { data: 2 };
+
 		let reader = test_channel.get_reader();
 		let events = reader.iter(&test_channel).collect::<Vec<&TestEvent>>();
 		assert_eq!(events, Vec::<&TestEvent>::new());
+
 		test_channel.send(event0);
 		test_channel.send(event1);
 		test_channel.flush();
+
 		let events = reader.iter(&test_channel).collect::<Vec<&TestEvent>>();
 		assert_eq!(events, [&TestEvent { data: 4 }, &TestEvent { data: 2 }]);
+		let reader2 = test_channel.get_reader();
+
+		let events = reader2.iter(&test_channel).collect::<Vec<&TestEvent>>();
+		assert_eq!(events, [&TestEvent { data: 4 }, &TestEvent { data: 2 }]);
+
+		test_channel.flush();
+		let events = reader2.iter(&test_channel).collect::<Vec<&TestEvent>>();
+		assert_eq!(events, Vec::<&TestEvent>::new());
 	}
 }
