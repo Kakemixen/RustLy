@@ -1,5 +1,4 @@
 use std::cell::{Ref, RefCell};
-use std::marker::PhantomData;
 
 // TODO if two buffers, maybe I can use refcell to enable coupling between
 // readers and channel
@@ -22,10 +21,10 @@ pub struct EventChannel<T>
 	readable_buffer: RefCell<EventBuffer>,
 }
 
-pub struct EventReader<T>
+pub struct EventReader<'a, T>
 {
 	read_events: RefCell<usize>,
-	dummy_: PhantomData<T>,
+	channel: &'a EventChannel<T>,
 }
 
 impl<T> EventChannel<T>
@@ -78,38 +77,38 @@ impl<T> EventChannel<T>
 	{
 		EventReader {
 			read_events: RefCell::new(0),
-			dummy_: Default::default(),
+			channel: self,
 		}
 	}
 }
 
-impl<T> EventReader<T>
+impl<'a, T> EventReader<'a, T>
 {
-	pub fn iter<'a>(&self, channel: &'a EventChannel<T>) -> Iter<'a, T>
+	pub fn iter(&self) -> Iter<'a, T>
 	{
 		// TODO would like to find a way to couple reader and channel
 		// A naive reference member had lifetime issues with current setup
 		let mut read_events = self.read_events.borrow_mut();
-		match *channel.readable_buffer.borrow() {
+		match *self.channel.readable_buffer.borrow() {
 			EventBuffer::A => {
-				if *read_events > *channel.start_idx_a.borrow() {
+				if *read_events > *self.channel.start_idx_a.borrow() {
 					Iter { inner: None }
 				}
 				else {
-					*read_events = *channel.start_idx_a.borrow() + 1;
+					*read_events = *self.channel.start_idx_a.borrow() + 1;
 					Iter {
-						inner: Some(Ref::map(channel.events_a.borrow(), |v| &v[..])),
+						inner: Some(Ref::map(self.channel.events_a.borrow(), |v| &v[..])),
 					}
 				}
 			}
 			EventBuffer::B => {
-				if *read_events > *channel.start_idx_b.borrow() {
+				if *read_events > *self.channel.start_idx_b.borrow() {
 					Iter { inner: None }
 				}
 				else {
-					*read_events = *channel.start_idx_b.borrow() + 1;
+					*read_events = *self.channel.start_idx_b.borrow() + 1;
 					Iter {
-						inner: Some(Ref::map(channel.events_b.borrow(), |v| &v[..])),
+						inner: Some(Ref::map(self.channel.events_b.borrow(), |v| &v[..])),
 					}
 				}
 			}
@@ -163,18 +162,12 @@ mod tests
 		let event1 = TestEvent { data: 1 };
 
 		let reader = test_channel.get_reader();
-		let events = reader
-			.iter(&test_channel)
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
+		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
 		assert_eq!(events, Vec::<TestEvent>::new(), "initial events empty");
 
 		test_channel.send(event0);
 		test_channel.flush();
-		let events = reader
-			.iter(&test_channel)
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
+		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
 		assert_eq!(
 			events,
 			[TestEvent { data: 0 }],
@@ -184,10 +177,7 @@ mod tests
 		test_channel.send(event1);
 		test_channel.flush();
 
-		let events = reader
-			.iter(&test_channel)
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
+		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
 		assert_eq!(
 			events,
 			[TestEvent { data: 1 }],
@@ -196,7 +186,7 @@ mod tests
 
 		let reader2 = test_channel.get_reader();
 		let events = reader2
-			.iter(&test_channel)
+			.iter()
 			.map(|x| x.clone())
 			.collect::<Vec<TestEvent>>();
 		assert_eq!(
@@ -206,7 +196,7 @@ mod tests
 			 dropped"
 		);
 		let events = reader2
-			.iter(&test_channel)
+			.iter()
 			.map(|x| x.clone())
 			.collect::<Vec<TestEvent>>();
 		assert_eq!(
@@ -217,7 +207,7 @@ mod tests
 
 		test_channel.flush();
 		let events = reader2
-			.iter(&test_channel)
+			.iter()
 			.map(|x| x.clone())
 			.collect::<Vec<TestEvent>>();
 		assert_eq!(events, Vec::<TestEvent>::new());
