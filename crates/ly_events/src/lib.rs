@@ -1,9 +1,6 @@
-use std::cell::{Ref, RefCell};
+use std::cell::UnsafeCell;
 
-// TODO if two buffers, maybe I can use refcell to enable coupling between
-// readers and channel
-// I cannot return an iterator of a RefCell<Vec<T>>, so perhaps that's not the
-// way
+// TODO add channel flush mutex
 
 #[derive(Debug)]
 enum EventBuffer
@@ -14,16 +11,16 @@ enum EventBuffer
 
 pub struct EventChannel<T>
 {
-	events_a: RefCell<Vec<T>>,
-	events_b: RefCell<Vec<T>>,
-	start_idx_a: RefCell<usize>,
-	start_idx_b: RefCell<usize>,
-	readable_buffer: RefCell<EventBuffer>,
+	events_a: UnsafeCell<Vec<T>>,
+	events_b: UnsafeCell<Vec<T>>,
+	start_idx_a: UnsafeCell<usize>,
+	start_idx_b: UnsafeCell<usize>,
+	readable_buffer: UnsafeCell<EventBuffer>,
 }
 
 pub struct EventReader<'a, T>
 {
-	read_events: RefCell<usize>,
+	read_events: UnsafeCell<usize>,
 	channel: &'a EventChannel<T>,
 }
 
@@ -32,43 +29,47 @@ impl<T> EventChannel<T>
 	pub fn new() -> EventChannel<T>
 	{
 		EventChannel {
-			events_a: RefCell::new(Vec::new()),
-			events_b: RefCell::new(Vec::new()),
-			start_idx_a: RefCell::new(0),
-			start_idx_b: RefCell::new(0),
-			readable_buffer: RefCell::new(EventBuffer::A),
+			events_a: UnsafeCell::new(Vec::new()), // maybe sensible initial?
+			events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
+			start_idx_a: UnsafeCell::new(0),
+			start_idx_b: UnsafeCell::new(0),
+			readable_buffer: UnsafeCell::new(EventBuffer::A),
 		}
 	}
 
 	pub fn send(&self, e: T)
 	{
-		match *self.readable_buffer.borrow() {
-			EventBuffer::A => {
-				(*self.events_b.borrow_mut()).push(e);
-				(*self.start_idx_b.borrow_mut()) += 1;
-			}
-			EventBuffer::B => {
-				(*self.events_a.borrow_mut()).push(e);
-				(*self.start_idx_a.borrow_mut()) += 1;
+		unsafe {
+			match *self.readable_buffer.get() {
+				EventBuffer::A => {
+					(*self.events_b.get()).push(e);
+					(*self.start_idx_b.get()) += 1;
+				}
+				EventBuffer::B => {
+					(*self.events_a.get()).push(e);
+					(*self.start_idx_a.get()) += 1;
+				}
 			}
 		}
 	}
 
 	pub fn flush(&self)
 	{
-		let mut readable_buffer = self.readable_buffer.borrow_mut();
-		match *readable_buffer {
-			EventBuffer::A => {
-				(*self.events_a.borrow_mut()).clear();
-				*readable_buffer = EventBuffer::B;
+		let readable_buffer = self.readable_buffer.get();
+		unsafe {
+			match *readable_buffer {
+				EventBuffer::A => {
+					(*self.events_a.get()).clear();
+					*readable_buffer = EventBuffer::B;
 
-				(*self.start_idx_a.borrow_mut()) = *self.start_idx_b.borrow();
-			}
-			EventBuffer::B => {
-				(*self.events_b.borrow_mut()).clear();
-				*readable_buffer = EventBuffer::A;
+					*self.start_idx_a.get() = *self.start_idx_b.get() // so that reading starts counting properly
+				}
+				EventBuffer::B => {
+					(*self.events_b.get()).clear();
+					*readable_buffer = EventBuffer::A;
 
-				(*self.start_idx_b.borrow_mut()) = *self.start_idx_a.borrow();
+					*self.start_idx_b.get() = *self.start_idx_a.get()
+				}
 			}
 		}
 	}
@@ -76,7 +77,7 @@ impl<T> EventChannel<T>
 	pub fn get_reader(&self) -> EventReader<T>
 	{
 		EventReader {
-			read_events: RefCell::new(0),
+			read_events: UnsafeCell::new(0),
 			channel: self,
 		}
 	}
@@ -84,61 +85,34 @@ impl<T> EventChannel<T>
 
 impl<'a, T> EventReader<'a, T>
 {
-	pub fn iter(&self) -> Iter<'a, T>
+	pub fn iter(&self) -> impl Iterator<Item = &'a T>
 	{
-		// TODO would like to find a way to couple reader and channel
-		// A naive reference member had lifetime issues with current setup
-		let mut read_events = self.read_events.borrow_mut();
-		match *self.channel.readable_buffer.borrow() {
-			EventBuffer::A => {
-				if *read_events > *self.channel.start_idx_a.borrow() {
-					Iter { inner: None }
+		unsafe {
+			// TODO should have a flush mutex
+			let readable_buffer = self.channel.readable_buffer.get();
+			let read_events = self.read_events.get();
+			match *readable_buffer {
+				EventBuffer::A => {
+					let start_idx_a = *self.channel.start_idx_a.get();
+					if *read_events > start_idx_a {
+						[].iter()
+					}
+					else {
+						*read_events = start_idx_a + 1;
+						(*self.channel.events_a.get()).iter()
+					}
 				}
-				else {
-					*read_events = *self.channel.start_idx_a.borrow() + 1;
-					Iter {
-						inner: Some(Ref::map(self.channel.events_a.borrow(), |v| &v[..])),
+				EventBuffer::B => {
+					let start_idx_b = *self.channel.start_idx_b.get();
+					if *read_events > start_idx_b {
+						[].iter()
+					}
+					else {
+						*read_events = start_idx_b + 1;
+						(*self.channel.events_b.get()).iter()
 					}
 				}
 			}
-			EventBuffer::B => {
-				if *read_events > *self.channel.start_idx_b.borrow() {
-					Iter { inner: None }
-				}
-				else {
-					*read_events = *self.channel.start_idx_b.borrow() + 1;
-					Iter {
-						inner: Some(Ref::map(self.channel.events_b.borrow(), |v| &v[..])),
-					}
-				}
-			}
-		}
-	}
-}
-
-// thanks kwarrick
-// https://stackoverflow.com/questions/33541492/returning-iterator-of-a-vec-in-a-refcell
-pub struct Iter<'a, T>
-{
-	inner: Option<Ref<'a, [T]>>,
-}
-
-impl<'a, T> Iterator for Iter<'a, T>
-{
-	type Item = Ref<'a, T>;
-
-	fn next(&mut self) -> Option<Self::Item>
-	{
-		match self.inner.take() {
-			Some(borrow) => match *borrow {
-				[] => None,
-				[_, ..] => {
-					let (head, tail) = Ref::map_split(borrow, |slice| (&slice[0], &slice[1..]));
-					self.inner.replace(tail);
-					Some(head)
-				}
-			},
-			None => None,
 		}
 	}
 }
@@ -148,7 +122,7 @@ mod tests
 {
 	use super::*;
 
-	#[derive(Clone, Debug, PartialEq, Eq)]
+	#[derive(Debug, PartialEq, Eq)]
 	struct TestEvent
 	{
 		data: usize,
@@ -162,54 +136,46 @@ mod tests
 		let event1 = TestEvent { data: 1 };
 
 		let reader = test_channel.get_reader();
-		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
-		assert_eq!(events, Vec::<TestEvent>::new(), "initial events empty");
+		let events = reader.iter().collect::<Vec<&TestEvent>>();
+		assert_eq!(events, Vec::<&TestEvent>::new(), "initial events empty");
 
 		test_channel.send(event0);
 		test_channel.flush();
-		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
+
+		let events = reader.iter().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
-			[TestEvent { data: 0 }],
+			[&TestEvent { data: 0 }],
 			"reader can read flushed event0"
 		);
 
 		test_channel.send(event1);
 		test_channel.flush();
 
-		let events = reader.iter().map(|x| x.clone()).collect::<Vec<TestEvent>>();
+		let events = reader.iter().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
-			[TestEvent { data: 1 }],
+			[&TestEvent { data: 1 }],
 			"We only retain the events most recently flushed, event0 is then dropped"
 		);
 
 		let reader2 = test_channel.get_reader();
-		let events = reader2
-			.iter()
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
+		let events = reader2.iter().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
-			[TestEvent { data: 1 }],
+			[&TestEvent { data: 1 }],
 			"We only retain the events most recently flushed, reader2 reads after event0 has been \
 			 dropped"
 		);
-		let events = reader2
-			.iter()
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
+		let events = reader2.iter().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
-			Vec::<TestEvent>::new(),
+			Vec::<&TestEvent>::new(),
 			"Cannot read event multiple times"
 		);
 
 		test_channel.flush();
-		let events = reader2
-			.iter()
-			.map(|x| x.clone())
-			.collect::<Vec<TestEvent>>();
-		assert_eq!(events, Vec::<TestEvent>::new());
+		let events = reader2.iter().collect::<Vec<&TestEvent>>();
+		assert_eq!(events, Vec::<&TestEvent>::new());
 	}
 }
