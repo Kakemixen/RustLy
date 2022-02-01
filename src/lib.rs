@@ -5,6 +5,8 @@ pub mod log
 
 use ly_log::core_prelude::*;
 
+pub use ly_events;
+
 pub fn test_log()
 {
 	core_error!("test {}", 2);
