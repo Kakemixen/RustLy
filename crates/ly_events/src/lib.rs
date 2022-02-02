@@ -115,6 +115,8 @@ impl<'a, T> EventReader<'a, T>
 			}
 		}
 	}
+
+	pub fn flush_channel(&self) { self.channel.flush(); }
 }
 
 #[cfg(test)]
