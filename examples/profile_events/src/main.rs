@@ -12,7 +12,7 @@ const NUM_EVENTS: usize = 1000000000;
 
 fn run() -> usize
 {
-	let channel = ly_events::EventChannel::<MyEvent>::new();
+	let channel = ly_events::SyncEventChannel::<MyEvent>::new();
 	let reader = channel.get_reader();
 	let mut total: usize = 0;
 
@@ -53,3 +53,4 @@ fn main()
 // no interior mutability:    34572 ms
 // RefCell implementation:    46615 ms
 // UnsafeCell implementation: 21074 ms
+// Sync implementation:      128548 ms
