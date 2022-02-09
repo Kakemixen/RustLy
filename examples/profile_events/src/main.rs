@@ -8,7 +8,7 @@ struct MyEvent
 
 const ITERATIONS: usize = 10;
 const READ_BATCH: usize = 20;
-const NUM_EVENTS: usize = 1000000000;
+const NUM_EVENTS: usize = 10000000;
 
 fn run() -> usize
 {
@@ -54,3 +54,11 @@ fn main()
 // RefCell implementation:    46615 ms
 // UnsafeCell implementation: 21074 ms
 // Sync implementation:      128548 ms
+//
+// -------
+// const ITERATIONS: usize = 10;
+// const READ_BATCH: usize = 20;
+// const NUM_EVENTS: usize = 10000000;
+//
+// Sync implementation:      1326 ms
+// parking_lot mutex:        1060 ms

@@ -1,6 +1,8 @@
 use std::cell::UnsafeCell;
 use std::sync::Weak;
-use std::sync::{Arc, Mutex};
+//use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 // TODO add channel flush mutex
 
@@ -147,25 +149,9 @@ impl<T> SyncEventChannel<T>
 		}
 	}
 
-	pub fn send(&self, e: T)
-	{
-		match self.channel.lock() {
-			Err(e) => panic!("event channel error {}!", e),
-			Ok(channel) => {
-				channel.send(e);
-			}
-		}
-	}
+	pub fn send(&self, e: T) { self.channel.lock().send(e); }
 
-	pub fn flush(&self)
-	{
-		match self.channel.lock() {
-			Err(e) => panic!("event channel error {}!", e),
-			Ok(channel) => {
-				channel.flush();
-			}
-		}
-	}
+	pub fn flush(&self) { self.channel.lock().flush(); }
 
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
@@ -186,7 +172,7 @@ impl<T> SyncEventReader<T>
 		match channel {
 			None => [].iter(),
 			Some(channel) => {
-				let channel = channel.lock().expect("event channel poison!");
+				let channel = channel.lock();
 				unsafe {
 					// TODO should have a flush mutex
 					let readable_buffer = channel.readable_buffer.get();
@@ -222,13 +208,10 @@ impl<T> SyncEventReader<T>
 	{
 		match self.channel.upgrade() {
 			None => Err("channel has been dropped".to_string()),
-			Some(channel) => match channel.lock() {
-				Err(_) => Err("Channel lock error".to_string()),
-				Ok(c) => {
-					c.flush();
-					Ok(())
-				}
-			},
+			Some(channel) => {
+				channel.lock().flush();
+				Ok(())
+			}
 		}
 	}
 }
@@ -322,7 +305,7 @@ mod tests
 				}
 				for e in rec.iter() {
 					got_events = true;
-					total.lock().expect("help").add_assign(e.data);
+					total.lock().add_assign(e.data);
 				}
 
 				if !got_events {
@@ -333,7 +316,7 @@ mod tests
 
 		emitter1.join().unwrap();
 		rec1.join().unwrap();
-		let total = total_loc.lock().unwrap();
+		let total = total_loc.lock();
 		assert!(total.eq(&90));
 	}
 }
