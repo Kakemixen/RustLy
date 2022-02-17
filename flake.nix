@@ -39,6 +39,7 @@
           LD_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
           RUST_BACKTRACE = 1;
           CFG_RELEASE_CHANNEL = "nightly";
+          CARGO_HOME = ".cargo";
         };
       }
     );
