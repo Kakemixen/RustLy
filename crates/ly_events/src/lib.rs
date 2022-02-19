@@ -7,7 +7,7 @@ use std::sync::Arc;
 // TODO add channel flush mutex
 
 #[derive(Debug)]
-enum EventBuffer
+enum ReadableEventBuffer
 {
 	A,
 	B,
@@ -19,7 +19,7 @@ pub struct EventChannel<T>
 	events_b: UnsafeCell<Vec<T>>,
 	start_idx_a: UnsafeCell<usize>,
 	start_idx_b: UnsafeCell<usize>,
-	readable_buffer: UnsafeCell<EventBuffer>,
+	readable_buffer: UnsafeCell<ReadableEventBuffer>,
 }
 
 pub struct EventReader<'a, T>
@@ -48,7 +48,7 @@ impl<T> EventChannel<T>
 			events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
 			start_idx_a: UnsafeCell::new(0),
 			start_idx_b: UnsafeCell::new(0),
-			readable_buffer: UnsafeCell::new(EventBuffer::A),
+			readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
 		}
 	}
 
@@ -56,11 +56,11 @@ impl<T> EventChannel<T>
 	{
 		unsafe {
 			match *self.readable_buffer.get() {
-				EventBuffer::A => {
+				ReadableEventBuffer::A => {
 					(*self.events_b.get()).push(e);
 					(*self.start_idx_b.get()) += 1;
 				}
-				EventBuffer::B => {
+				ReadableEventBuffer::B => {
 					(*self.events_a.get()).push(e);
 					(*self.start_idx_a.get()) += 1;
 				}
@@ -73,15 +73,15 @@ impl<T> EventChannel<T>
 		let readable_buffer = self.readable_buffer.get();
 		unsafe {
 			match *readable_buffer {
-				EventBuffer::A => {
+				ReadableEventBuffer::A => {
 					(*self.events_a.get()).clear();
-					*readable_buffer = EventBuffer::B;
+					*readable_buffer = ReadableEventBuffer::B;
 
 					*self.start_idx_a.get() = *self.start_idx_b.get() // so that reading starts counting properly
 				}
-				EventBuffer::B => {
+				ReadableEventBuffer::B => {
 					(*self.events_b.get()).clear();
-					*readable_buffer = EventBuffer::A;
+					*readable_buffer = ReadableEventBuffer::A;
 
 					*self.start_idx_b.get() = *self.start_idx_a.get()
 				}
@@ -107,7 +107,7 @@ impl<'a, T> EventReader<'a, T>
 			let readable_buffer = self.channel.readable_buffer.get();
 			let read_events = self.read_events.get();
 			match *readable_buffer {
-				EventBuffer::A => {
+				ReadableEventBuffer::A => {
 					let start_idx_a = *self.channel.start_idx_a.get();
 					if *read_events > start_idx_a {
 						[].iter()
@@ -117,7 +117,7 @@ impl<'a, T> EventReader<'a, T>
 						(*self.channel.events_a.get()).iter()
 					}
 				}
-				EventBuffer::B => {
+				ReadableEventBuffer::B => {
 					let start_idx_b = *self.channel.start_idx_b.get();
 					if *read_events > start_idx_b {
 						[].iter()
@@ -144,7 +144,7 @@ impl<T> SyncEventChannel<T>
 				events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
 				start_idx_a: UnsafeCell::new(0),
 				start_idx_b: UnsafeCell::new(0),
-				readable_buffer: UnsafeCell::new(EventBuffer::A),
+				readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
 			})),
 		}
 	}
@@ -178,7 +178,7 @@ impl<T> SyncEventReader<T>
 					let readable_buffer = channel.readable_buffer.get();
 					let read_events = self.read_events.get();
 					match *readable_buffer {
-						EventBuffer::A => {
+						ReadableEventBuffer::A => {
 							let start_idx_a = *channel.start_idx_a.get();
 							if *read_events > start_idx_a {
 								[].iter()
@@ -188,7 +188,7 @@ impl<T> SyncEventReader<T>
 								(*channel.events_a.get()).iter()
 							}
 						}
-						EventBuffer::B => {
+						ReadableEventBuffer::B => {
 							let start_idx_b = *channel.start_idx_b.get();
 							if *read_events > start_idx_b {
 								[].iter()
