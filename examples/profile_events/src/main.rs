@@ -1,4 +1,5 @@
 use rustly::ly_events;
+use std::sync::Arc;
 use std::time::Instant;
 
 struct MyEvent
@@ -12,7 +13,7 @@ const NUM_EVENTS: usize = 10000000;
 
 fn run() -> usize
 {
-	let channel = ly_events::SyncEventChannel::<MyEvent>::new();
+	let channel = Arc::new(ly_events::SyncEventChannel::<MyEvent>::new());
 	let reader = channel.get_reader();
 	let mut total: usize = 0;
 
@@ -37,7 +38,7 @@ fn run() -> usize
 fn main()
 {
 	let mut times = Vec::with_capacity(ITERATIONS);
-	for i in 0..ITERATIONS {
+	for _ in 0..ITERATIONS {
 		let time = run();
 		times.push(time);
 	}
@@ -60,5 +61,8 @@ fn main()
 // const READ_BATCH: usize = 20;
 // const NUM_EVENTS: usize = 10000000;
 //
+// !Sync for reference:       236 ms
+// !Sync wrapped in Arc:      365 ms
 // Sync implementation:      1326 ms
 // parking_lot mutex:        1060 ms
+// separate mutex:            990 ms

@@ -1,6 +1,7 @@
 use std::cell::UnsafeCell;
 use std::sync::Weak;
 //use std::sync::{Arc, Mutex};
+use core::marker::PhantomData;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -30,14 +31,19 @@ pub struct EventReader<'a, T>
 
 pub struct SyncEventChannel<T>
 {
-	channel: Arc<Mutex<EventChannel<T>>>,
+	channel: EventChannel<T>,
+	write_mutex: Mutex<()>,
+	flush_mutex: Mutex<()>,
 }
 
-pub struct SyncEventReader<T>
+pub struct SyncEventReader<'a, T>
 {
 	read_events: UnsafeCell<usize>,
-	channel: Weak<Mutex<EventChannel<T>>>,
+	channel: &'a SyncEventChannel<T>,
+	_not_send_sync: PhantomData<*const ()>,
 }
+
+unsafe impl<T> Sync for SyncEventChannel<T> {}
 
 impl<T> EventChannel<T>
 {
@@ -139,80 +145,75 @@ impl<T> SyncEventChannel<T>
 	pub fn new() -> SyncEventChannel<T>
 	{
 		SyncEventChannel {
-			channel: Arc::new(Mutex::new(EventChannel {
-				events_a: UnsafeCell::new(Vec::new()), // maybe sensible initial?
-				events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
-				start_idx_a: UnsafeCell::new(0),
-				start_idx_b: UnsafeCell::new(0),
-				readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
-			})),
+			channel: EventChannel::new(),
+			write_mutex: Mutex::new(()),
+			flush_mutex: Mutex::new(()),
 		}
 	}
 
-	pub fn send(&self, e: T) { self.channel.lock().send(e); }
+	pub fn send(&self, e: T)
+	{
+		let lock = self.write_mutex.lock();
+		self.channel.send(e);
+	}
 
-	pub fn flush(&self) { self.channel.lock().flush(); }
+	pub fn flush(&self)
+	{
+		let lock = self.flush_mutex.lock();
+		self.channel.flush();
+	}
 
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
 		SyncEventReader {
 			read_events: UnsafeCell::new(0),
-			channel: Arc::downgrade(&self.channel),
+			channel: self,
+			_not_send_sync: PhantomData,
 		}
 	}
 }
 
-impl<T> SyncEventReader<T>
+impl<'a, T> SyncEventReader<'a, T>
 {
-	pub fn iter<'a>(&self) -> impl Iterator<Item = &'a T>
+	pub fn iter<'b>(&self) -> impl Iterator<Item = &'b T>
 	where
-		T: 'a,
+		T: 'b,
 	{
-		let channel = self.channel.upgrade();
-		match channel {
-			None => [].iter(),
-			Some(channel) => {
-				let channel = channel.lock();
-				unsafe {
-					// TODO should have a flush mutex
-					let readable_buffer = channel.readable_buffer.get();
-					let read_events = self.read_events.get();
-					match *readable_buffer {
-						ReadableEventBuffer::A => {
-							let start_idx_a = *channel.start_idx_a.get();
-							if *read_events > start_idx_a {
-								[].iter()
-							}
-							else {
-								*read_events = start_idx_a + 1;
-								(*channel.events_a.get()).iter()
-							}
-						}
-						ReadableEventBuffer::B => {
-							let start_idx_b = *channel.start_idx_b.get();
-							if *read_events > start_idx_b {
-								[].iter()
-							}
-							else {
-								*read_events = start_idx_b + 1;
-								(*channel.events_b.get()).iter()
-							}
-						}
+		let lock = self.channel.flush_mutex.lock();
+		let channel = &self.channel.channel;
+		unsafe {
+			// TODO should have a flush mutex
+			let readable_buffer = channel.readable_buffer.get();
+			let read_events = self.read_events.get();
+			match *readable_buffer {
+				ReadableEventBuffer::A => {
+					let start_idx_a = *channel.start_idx_a.get();
+					if *read_events > start_idx_a {
+						[].iter()
+					}
+					else {
+						*read_events = start_idx_a + 1;
+						(*channel.events_a.get()).iter()
+					}
+				}
+				ReadableEventBuffer::B => {
+					let start_idx_b = *channel.start_idx_b.get();
+					if *read_events > start_idx_b {
+						[].iter()
+					}
+					else {
+						*read_events = start_idx_b + 1;
+						(*channel.events_b.get()).iter()
 					}
 				}
 			}
 		}
 	}
 
-	pub fn flush_channel(&self) -> Result<(), String>
+	pub fn flush_channel(&self)
 	{
-		match self.channel.upgrade() {
-			None => Err("channel has been dropped".to_string()),
-			Some(channel) => {
-				channel.lock().flush();
-				Ok(())
-			}
-		}
+		let lock = self.channel.flush_mutex.lock();
+		self.channel.channel.flush();
 	}
 }
 
@@ -283,26 +284,25 @@ mod tests
 	#[test]
 	fn sync_basic()
 	{
-		let channel = SyncEventChannel::<TestEvent>::new();
+		let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
 		let total = Arc::new(Mutex::new(0));
 		let total_loc = Arc::clone(&total);
 
-		let rec = channel.get_reader();
+		let c = Arc::clone(&channel);
 		let emitter1 = thread::spawn(move || {
 			for i in 0..10 {
 				let event = TestEvent { data: 2 * i };
-				channel.send(event);
+				c.send(event);
 				thread::sleep_ms(1);
 			}
 		});
 
 		let rec1 = thread::spawn(move || {
+			let rec = channel.get_reader();
 			loop {
 				thread::sleep_ms(5);
 				let mut got_events = false;
-				if let Err(_) = rec.flush_channel() {
-					break;
-				}
+				rec.flush_channel();
 				for e in rec.iter() {
 					got_events = true;
 					total.lock().add_assign(e.data);
