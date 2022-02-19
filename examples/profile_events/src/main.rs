@@ -66,3 +66,4 @@ fn main()
 // Sync implementation:      1326 ms
 // parking_lot mutex:        1060 ms
 // separate mutex:            990 ms
+// RwLock:                   1010 ms

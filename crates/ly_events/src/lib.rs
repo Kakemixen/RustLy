@@ -1,11 +1,7 @@
-use std::cell::UnsafeCell;
-use std::sync::Weak;
-//use std::sync::{Arc, Mutex};
 use core::marker::PhantomData;
-use parking_lot::Mutex;
-use std::sync::Arc;
-
-// TODO add channel flush mutex
+use parking_lot::{Mutex, RwLock, RwLockReadGuard};
+use std::cell::UnsafeCell;
+use std::slice::Iter;
 
 #[derive(Debug)]
 enum ReadableEventBuffer
@@ -33,14 +29,14 @@ pub struct SyncEventChannel<T>
 {
 	channel: EventChannel<T>,
 	write_mutex: Mutex<()>,
-	flush_mutex: Mutex<()>,
+	flush_mutex: RwLock<()>,
 }
 
 pub struct SyncEventReader<'a, T>
 {
 	read_events: UnsafeCell<usize>,
 	channel: &'a SyncEventChannel<T>,
-	_not_send_sync: PhantomData<*const ()>,
+	_not_send_sync: PhantomData<*const ()>, // to explicitly say it cannot be sent
 }
 
 unsafe impl<T> Sync for SyncEventChannel<T> {}
@@ -106,10 +102,9 @@ impl<T> EventChannel<T>
 
 impl<'a, T> EventReader<'a, T>
 {
-	pub fn iter(&self) -> impl Iterator<Item = &'a T>
+	pub fn iter(&self) -> impl Iterator<Item = &T>
 	{
 		unsafe {
-			// TODO should have a flush mutex
 			let readable_buffer = self.channel.readable_buffer.get();
 			let read_events = self.read_events.get();
 			match *readable_buffer {
@@ -147,7 +142,7 @@ impl<T> SyncEventChannel<T>
 		SyncEventChannel {
 			channel: EventChannel::new(),
 			write_mutex: Mutex::new(()),
-			flush_mutex: Mutex::new(()),
+			flush_mutex: RwLock::new(()),
 		}
 	}
 
@@ -159,7 +154,7 @@ impl<T> SyncEventChannel<T>
 
 	pub fn flush(&self)
 	{
-		let lock = self.flush_mutex.lock();
+		let lock = self.flush_mutex.write();
 		self.channel.flush();
 	}
 
@@ -175,46 +170,66 @@ impl<T> SyncEventChannel<T>
 
 impl<'a, T> SyncEventReader<'a, T>
 {
-	pub fn iter<'b>(&self) -> impl Iterator<Item = &'b T>
-	where
-		T: 'b,
+	pub fn iter(&self) -> impl Iterator<Item = &T>
 	{
-		let lock = self.channel.flush_mutex.lock();
+		let read_lock = self.channel.flush_mutex.read();
 		let channel = &self.channel.channel;
 		unsafe {
-			// TODO should have a flush mutex
 			let readable_buffer = channel.readable_buffer.get();
 			let read_events = self.read_events.get();
 			match *readable_buffer {
 				ReadableEventBuffer::A => {
 					let start_idx_a = *channel.start_idx_a.get();
 					if *read_events > start_idx_a {
-						[].iter()
+						EventIterator {
+							read_lock,
+							iterator: [].iter(),
+						}
 					}
 					else {
 						*read_events = start_idx_a + 1;
-						(*channel.events_a.get()).iter()
+						let iterator = (*channel.events_a.get()).iter();
+						EventIterator {
+							read_lock,
+							iterator,
+						}
 					}
 				}
 				ReadableEventBuffer::B => {
 					let start_idx_b = *channel.start_idx_b.get();
 					if *read_events > start_idx_b {
-						[].iter()
+						EventIterator {
+							read_lock,
+							iterator: [].iter(),
+						}
 					}
 					else {
 						*read_events = start_idx_b + 1;
-						(*channel.events_b.get()).iter()
+						let iterator = (*channel.events_b.get()).iter();
+						EventIterator {
+							read_lock,
+							iterator,
+						}
 					}
 				}
 			}
 		}
 	}
 
-	pub fn flush_channel(&self)
-	{
-		let lock = self.channel.flush_mutex.lock();
-		self.channel.channel.flush();
-	}
+	pub fn flush_channel(&self) { self.channel.flush(); }
+}
+
+struct EventIterator<'a, T>
+{
+	read_lock: RwLockReadGuard<'a, ()>,
+	iterator: Iter<'a, T>,
+}
+
+impl<'a, T> Iterator for EventIterator<'a, T>
+{
+	type Item = &'a T;
+
+	fn next(&mut self) -> Option<Self::Item> { self.iterator.next() }
 }
 
 #[cfg(test)]
@@ -222,6 +237,7 @@ mod tests
 {
 	use super::*;
 	use std::ops::AddAssign;
+	use std::sync::Arc;
 	use std::thread;
 
 	#[derive(Debug, PartialEq, Eq)]
@@ -287,7 +303,6 @@ mod tests
 		let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
 		let total = Arc::new(Mutex::new(0));
 		let total_loc = Arc::clone(&total);
-
 		let c = Arc::clone(&channel);
 		let emitter1 = thread::spawn(move || {
 			for i in 0..10 {
