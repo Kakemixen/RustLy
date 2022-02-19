@@ -15,12 +15,19 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+          extensions = [
+            "rust-src"
+            "rustfmt-preview"
+            "rust-analyzer-preview"
+          ];
+        });
       in
       with pkgs;
       {
         devShell = mkShell {
           buildInputs = [
-            rust-bin.nightly.latest.default
+            rust
             glslang
             vulkan-headers
             vulkan-loader
