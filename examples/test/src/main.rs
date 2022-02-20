@@ -1,6 +1,7 @@
 use rustly;
 use rustly::log::*;
 use std::thread;
+use std::time::Duration;
 
 fn main()
 {
@@ -36,5 +37,5 @@ fn main()
 	handle2.join().unwrap();
 	handle3.join().unwrap();
 
-	thread::sleep_ms(10);
+	thread::sleep(Duration::from_millis(10));
 }

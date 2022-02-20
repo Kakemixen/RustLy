@@ -37,6 +37,7 @@ struct LogEvent
 enum LogEnum
 {
 	Msg(LogEvent),
+	#[cfg(feature = "disallow_blocking")]
 	Kill(String),
 }
 
@@ -87,6 +88,7 @@ fn init_channel() -> LogSender
 					LogEnum::Msg(event) => {
 						print_log_event(event);
 					}
+					#[cfg(feature = "disallow_blocking")]
 					LogEnum::Kill(msg) => {
 						println!("{}: {}", "Logging abort reason".red(), msg);
 						std::process::abort();
@@ -182,14 +184,15 @@ impl Log for Logger
 						blocking: tx.is_full(),
 						..e
 					};
-					tx.send(LogEnum::Msg(blocking_event));
+					tx.send(LogEnum::Msg(blocking_event)).unwrap();
 				}
 				#[cfg(feature = "disallow_blocking")]
 				channel::TrySendError::Full(LogEnum::Msg(e)) => {
 					tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
 				}
+				#[cfg(feature = "disallow_blocking")]
 				channel::TrySendError::Full(LogEnum::Kill(e)) => {
-					tx.send(LogEnum::Kill(e));
+					tx.send(LogEnum::Kill(e)).unwrap();
 				}
 				channel::TrySendError::Disconnected(_) => {
 					panic!("Disconnected logger, can't send logs");

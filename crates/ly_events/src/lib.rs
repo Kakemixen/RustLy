@@ -148,13 +148,13 @@ impl<T> SyncEventChannel<T>
 
 	pub fn send(&self, e: T)
 	{
-		let lock = self.write_mutex.lock();
+		let _lock = self.write_mutex.lock();
 		self.channel.send(e);
 	}
 
 	pub fn flush(&self)
 	{
-		let lock = self.flush_mutex.write();
+		let _lock = self.flush_mutex.write();
 		self.channel.flush();
 	}
 
@@ -221,6 +221,7 @@ impl<'a, T> SyncEventReader<'a, T>
 
 struct EventIterator<'a, T>
 {
+	#[allow(dead_code)]
 	read_lock: RwLockReadGuard<'a, ()>,
 	iterator: Iter<'a, T>,
 }
@@ -239,6 +240,7 @@ mod tests
 	use std::ops::AddAssign;
 	use std::sync::Arc;
 	use std::thread;
+	use std::time::Duration;
 
 	#[derive(Debug, PartialEq, Eq)]
 	struct TestEvent
@@ -308,14 +310,14 @@ mod tests
 			for i in 0..10 {
 				let event = TestEvent { data: 2 * i };
 				c.send(event);
-				thread::sleep_ms(1);
+				thread::sleep(Duration::from_millis(1));
 			}
 		});
 
 		let rec1 = thread::spawn(move || {
 			let rec = channel.get_reader();
 			loop {
-				thread::sleep_ms(5);
+				thread::sleep(Duration::from_millis(5));
 				let mut got_events = false;
 				rec.flush_channel();
 				for e in rec.iter() {
