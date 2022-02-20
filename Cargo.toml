@@ -6,9 +6,15 @@ edition = "2018"
 [workspace]
 members = [
 	"crates/*",
-	"examples/*",
 ]
 
 [dependencies]
 ly_log = { path = "crates/ly_log" }
 ly_events = { path = "crates/ly_events" }
+ly_window = { path = "crates/ly_window" }
+
+[[example]]
+name = "hello_world"
+
+[[example]]
+name = "profile_events"

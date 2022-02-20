@@ -157,6 +157,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ly_window"
+version = "0.1.0"
+
+[[package]]
 name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -195,13 +199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "profile_events"
-version = "0.1.0"
-dependencies = [
- "rustly",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,6 +213,7 @@ version = "0.1.0"
 dependencies = [
  "ly_events",
  "ly_log",
+ "ly_window",
 ]
 
 [[package]]
@@ -229,13 +227,6 @@ name = "smallvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
-
-[[package]]
-name = "test"
-version = "0.1.0"
-dependencies = [
- "rustly",
-]
 
 [[package]]
 name = "thread_local"
