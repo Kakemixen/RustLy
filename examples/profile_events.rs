@@ -1,4 +1,4 @@
-use rustly::ly_events;
+use rustly::events;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -13,7 +13,7 @@ const NUM_EVENTS: usize = 10000000;
 
 fn run() -> usize
 {
-	let channel = Arc::new(ly_events::SyncEventChannel::<MyEvent>::new());
+	let channel = Arc::new(events::SyncEventChannel::<MyEvent>::new());
 	let reader = channel.get_reader();
 	let mut total: usize = 0;
 

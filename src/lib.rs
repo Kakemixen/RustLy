@@ -5,7 +5,15 @@ pub mod log
 
 use ly_log::core_prelude::*;
 
-pub use ly_events;
+pub mod events
+{
+	pub use ly_events::*;
+}
+
+pub mod window
+{
+	pub use ly_window::*;
+}
 
 pub fn test_log()
 {

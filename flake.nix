@@ -25,7 +25,7 @@
       in
       with pkgs;
       {
-        devShell = mkShell {
+        devShell = pkgs.mkShell rec {
           buildInputs = [
             rust
             glslang
@@ -37,13 +37,16 @@
             xorg.libX11
             xorg.libXau
             xorg.libXdmcp
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXext
 
             which
             gdb
           ];
 
           VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
-          LD_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
+          LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
           RUST_BACKTRACE = 1;
           CFG_RELEASE_CHANNEL = "nightly";
           CARGO_HOME = ".cargo";
