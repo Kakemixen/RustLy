@@ -24,7 +24,7 @@ fn main()
 			thread::sleep(Duration::from_millis(1));
 
 			c.flush();
-			for event in reader.iter() {
+			for event in reader.read() {
 				match event {
 					window::LyWindowEvent::WindowClose => should_exit = true,
 					window::LyWindowEvent::MousePressed(key) => {

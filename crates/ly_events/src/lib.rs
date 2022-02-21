@@ -170,7 +170,7 @@ impl<T> SyncEventChannel<T>
 
 impl<'a, T> SyncEventReader<'a, T>
 {
-	pub fn iter(&self) -> impl Iterator<Item = &T>
+	pub fn read(&self) -> impl Iterator<Item = &T>
 	{
 		let read_lock = self.channel.flush_mutex.read();
 		let channel = &self.channel.channel;
@@ -320,7 +320,7 @@ mod tests
 				thread::sleep(Duration::from_millis(5));
 				let mut got_events = false;
 				rec.flush_channel();
-				for e in rec.iter() {
+				for e in rec.read() {
 					got_events = true;
 					total.lock().add_assign(e.data);
 				}

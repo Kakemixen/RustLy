@@ -24,7 +24,7 @@ fn run() -> usize
 
 		if i % READ_BATCH == 0 {
 			channel.flush();
-			for e in reader.iter() {
+			for e in reader.read() {
 				total += e.num;
 			}
 		}
