@@ -1,6 +1,8 @@
 #![feature(trait_alias)]
 
 use ly_events as events;
+use ly_log::core_prelude::*;
+use std::sync::Arc;
 use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::window::Window;
@@ -12,7 +14,7 @@ pub enum LyWindowEvent
 	MouseReleased(i32),
 	KeyPressed(i32),
 	KeyReleased(i32),
-	WindowClose(),
+	WindowClose,
 }
 
 pub trait EventHandler =
@@ -21,6 +23,7 @@ pub trait EventHandler =
 pub struct LyWindow
 {
 	event_loop: EventLoop<()>,
+	#[allow(dead_code)]
 	window: Window,
 }
 
@@ -59,6 +62,60 @@ pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 				println!("The close button was pressed; stopping");
 				*control_flow = ControlFlow::Exit;
 			}
+			_ => (),
+		},
+	)
+}
+
+pub fn get_sync_forwarding_event_loop(
+	channel: Arc<events::SyncEventChannel<LyWindowEvent>>,
+) -> Box<dyn EventHandler>
+{
+	Box::new(
+		move |event, _, control_flow: &mut ControlFlow| match event {
+			event::Event::WindowEvent {
+				event,
+				window_id: _winit_window_id,
+				..
+			} => match event {
+				event::WindowEvent::CloseRequested => {
+					core_info!("The close button was pressed; stopping");
+					channel.send(LyWindowEvent::WindowClose);
+					*control_flow = ControlFlow::Exit;
+				}
+				event::WindowEvent::MouseInput { button, state, .. } => match state {
+					event::ElementState::Pressed => match button {
+						event::MouseButton::Left => {
+							core_info!("sending left press");
+							channel.send(LyWindowEvent::MousePressed(0));
+						}
+						event::MouseButton::Right => {
+							core_info!("sending right press");
+							channel.send(LyWindowEvent::MousePressed(1));
+						}
+						_ => (),
+					},
+					event::ElementState::Released => match button {
+						event::MouseButton::Left => {
+							core_info!("sending left release");
+							channel.send(LyWindowEvent::MouseReleased(0));
+						}
+						event::MouseButton::Right => {
+							core_info!("sending right release");
+							channel.send(LyWindowEvent::MouseReleased(1));
+						}
+						_ => (),
+					},
+				},
+				_ => (),
+			},
+			event::Event::DeviceEvent {
+				event,
+				device_id: _winit_device_id,
+			} => match event {
+				_ => (),
+			},
+			event::Event::MainEventsCleared => {}
 			_ => (),
 		},
 	)

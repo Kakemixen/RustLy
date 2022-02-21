@@ -443,6 +443,7 @@ name = "ly_window"
 version = "0.1.0"
 dependencies = [
  "ly_events",
+ "ly_log",
  "winit",
 ]
 
