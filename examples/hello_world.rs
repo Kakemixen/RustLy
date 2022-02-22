@@ -2,7 +2,7 @@ use rustly::log::*;
 use rustly::{events, window};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+//use std::time::Duration;
 
 fn main()
 {
@@ -15,15 +15,17 @@ fn main()
 	thread::spawn(move || {
 		let reader = c.get_reader();
 
-		// TODO this uses 100% CPU of this thread
 		loop {
 			let mut should_exit = false;
 
 			// need this for some reason, or it will drop events
 			// TODO why?
-			thread::sleep(Duration::from_millis(1));
+			// thread::sleep(Duration::from_millis(1));
+			// wait_new solves it here, but not root cause
+			reader.wait_new();
 
-			c.flush();
+			info!("flushing!");
+			reader.flush_channel();
 			for event in reader.read() {
 				match event {
 					window::LyWindowEvent::WindowClose => should_exit = true,

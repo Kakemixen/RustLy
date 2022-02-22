@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use crossbeam::sync::{Parker, Unparker};
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
@@ -33,6 +34,8 @@ pub struct SyncEventChannel<T>
 	channel: EventChannel<T>,
 	write_mutex: Mutex<()>,
 	flush_mutex: RwLock<()>,
+	new_event_waiters: UnsafeCell<Vec<Unparker>>,
+	flushed_waiters: UnsafeCell<Vec<Unparker>>,
 }
 
 pub struct SyncEventReader<'a, T>
@@ -146,6 +149,8 @@ impl<T> SyncEventChannel<T>
 			channel: EventChannel::new(),
 			write_mutex: Mutex::new(()),
 			flush_mutex: RwLock::new(()),
+			new_event_waiters: UnsafeCell::new(Vec::new()),
+			flushed_waiters: UnsafeCell::new(Vec::new()),
 		}
 	}
 
@@ -153,12 +158,18 @@ impl<T> SyncEventChannel<T>
 	{
 		let _lock = self.write_mutex.lock();
 		self.channel.send(e);
+		unsafe {
+			event_signal::signal_waiters(&mut *self.new_event_waiters.get());
+		}
 	}
 
 	pub fn flush(&self)
 	{
 		let _lock = self.flush_mutex.write();
 		self.channel.flush();
+		unsafe {
+			event_signal::signal_waiters(&mut *self.flushed_waiters.get());
+		}
 	}
 
 	pub fn get_reader(&self) -> SyncEventReader<T>
@@ -220,6 +231,26 @@ impl<'a, T> SyncEventReader<'a, T>
 	}
 
 	pub fn flush_channel(&self) { self.channel.flush(); }
+
+	pub fn wait_new(&self)
+	{
+		let _lock = self.channel.write_mutex.lock();
+		unsafe {
+			let p = event_signal::add_waiter(&mut *self.channel.new_event_waiters.get());
+			drop(_lock);
+			p.park();
+		}
+	}
+
+	pub fn wait_flushed(&self)
+	{
+		let _lock = self.channel.flush_mutex.write();
+		unsafe {
+			let p = event_signal::add_waiter(&mut *self.channel.flushed_waiters.get());
+			drop(_lock);
+			p.park();
+		}
+	}
 }
 
 struct EventIterator<'a, T>

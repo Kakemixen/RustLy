@@ -67,3 +67,5 @@ fn main()
 // parking_lot mutex:        1060 ms
 // separate mutex:            990 ms
 // RwLock:                   1010 ms
+// adding event signal:      1919 ms
+// sharing mutex:            1157 ms

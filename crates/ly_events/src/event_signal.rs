@@ -18,21 +18,32 @@ impl SignalEvent
 	pub fn signal(&self)
 	{
 		let mut waiters = self.waiters.lock();
-		for waiter in waiters.iter() {
-			waiter.unpark();
-		}
-		waiters.clear();
+		signal_waiters(&mut waiters);
 	}
 
 	pub fn wait(&self)
 	{
-		let p = Parker::new();
-		let u = p.unparker().clone();
-		{
-			self.waiters.lock().push(u);
-		}
+		let p = add_waiter(&mut self.waiters.lock());
 		p.park();
 	}
+}
+
+// internal convenience function
+pub fn signal_waiters(waiters: &mut Vec<Unparker>)
+{
+	for waiter in waiters.iter() {
+		waiter.unpark();
+	}
+	waiters.clear();
+}
+
+// internal convenience function
+pub fn add_waiter(waiters: &mut Vec<Unparker>) -> Parker
+{
+	let p = Parker::new();
+	let u = p.unparker().clone();
+	waiters.push(u);
+	p
 }
 
 #[cfg(test)]
