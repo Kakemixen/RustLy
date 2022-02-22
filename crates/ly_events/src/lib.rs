@@ -3,6 +3,9 @@ use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
 
+mod event_signal;
+pub use event_signal::SignalEvent;
+
 #[derive(Debug)]
 enum ReadableEventBuffer
 {

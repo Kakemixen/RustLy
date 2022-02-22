@@ -426,6 +426,7 @@ dependencies = [
 name = "ly_events"
 version = "0.1.0"
 dependencies = [
+ "crossbeam",
  "parking_lot 0.12.0",
 ]
 
