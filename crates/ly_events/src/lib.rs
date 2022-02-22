@@ -334,7 +334,7 @@ mod tests
 	}
 
 	#[test]
-	fn sync_basic()
+	fn sync_001()
 	{
 		let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
 		let total = Arc::new(Mutex::new(0));
@@ -369,5 +369,98 @@ mod tests
 		rec1.join().unwrap();
 		let total = total_loc.lock();
 		assert!(total.eq(&90));
+	}
+
+	#[test]
+	/// test waiting for new events
+	fn sync_002()
+	{
+		let channel = Arc::new(SyncEventChannel::<()>::new());
+		let total_loc = Arc::new(Mutex::new(0));
+
+		let total = Arc::clone(&total_loc);
+		let c = Arc::clone(&channel);
+		let emitter1 = thread::spawn(move || {
+			thread::sleep(Duration::from_millis(2));
+			for i in 1..11 {
+				c.send(());
+				thread::sleep(Duration::from_millis(2));
+				assert!(total.lock().eq(&i));
+			}
+		});
+
+		let total = Arc::clone(&total_loc);
+		let rec1 = thread::spawn(move || {
+			let rec = channel.get_reader();
+			for _ in 1..11 {
+				rec.wait_new();
+				rec.flush_channel();
+				for _ in rec.read() {
+					total.lock().add_assign(1);
+				}
+			}
+		});
+
+		emitter1.join().unwrap();
+		rec1.join().unwrap();
+		let total = total_loc.lock();
+		assert!(total.eq(&10));
+	}
+
+	#[test]
+	/// test waiting for flush
+	fn sync_003()
+	{
+		let channel = Arc::new(SyncEventChannel::<()>::new());
+		let total_loc = Arc::new(Mutex::new(0));
+
+		let total = Arc::clone(&total_loc);
+		let c = Arc::clone(&channel);
+		let emitter1 = thread::spawn(move || {
+			thread::sleep(Duration::from_millis(5));
+			for i in 1..11 {
+				c.send(());
+				thread::sleep(Duration::from_millis(5));
+
+				// two readers should update when main thread flushes
+				assert!(total.lock().eq(&(i * 2)));
+			}
+		});
+
+		let c = Arc::clone(&channel);
+		let total = Arc::clone(&total_loc);
+		let rec1 = thread::spawn(move || {
+			let rec = c.get_reader();
+			for _ in 1..11 {
+				rec.wait_flushed();
+				for _ in rec.read() {
+					total.lock().add_assign(1);
+				}
+			}
+		});
+
+		let c = Arc::clone(&channel);
+		let total = Arc::clone(&total_loc);
+		let rec2 = thread::spawn(move || {
+			let rec = c.get_reader();
+			for _ in 1..11 {
+				rec.wait_flushed();
+				for _ in rec.read() {
+					total.lock().add_assign(1);
+				}
+			}
+		});
+
+		let rec = channel.get_reader();
+		for _ in 1..11 {
+			rec.wait_new();
+			rec.flush_channel();
+		}
+
+		emitter1.join().unwrap();
+		rec1.join().unwrap();
+		rec2.join().unwrap();
+		let total = total_loc.lock();
+		assert!(total.eq(&20));
 	}
 }

@@ -56,7 +56,7 @@ mod tests
 	use std::time::Duration;
 
 	#[test]
-	fn t001()
+	fn signal_001()
 	{
 		let total = Arc::new(Mutex::new(0));
 		let t = Arc::clone(&total);
