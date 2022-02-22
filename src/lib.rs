@@ -1,3 +1,29 @@
+//! The LY engine aims to provide an ECS game engine with a vulkan renderer
+//!
+//! ### This Crate
+//! The main crate re-exports the relevant API from the sub-crates,
+//! making is more ergonomic to consume the public API.
+//!
+//! You can use those crates directly if you want,
+//! they export some more functionality intended for the engine core.
+
+/// Logging module for LY engine clients
+///
+/// It contains macros to log format strings via a logging thread
+///
+/// The logger must be initiaized with the [log::log_init] function
+///
+/// There are five logging levels/macros, listed in increasing severity:
+/// `trace!`, `debug!`, `info!`, `warning!`, `error!`.
+///
+/// Which log level is used is decided at compile time with the following
+/// features, with each feature also disabling all logs of a lower severity:
+/// - `strip_trace`
+/// - `strip_debug`
+/// - `strip_info`
+/// - `strip_warning`
+///
+/// crate doc: [ly_log]
 pub mod log
 {
 	pub use ly_log::prelude::*;
@@ -5,11 +31,17 @@ pub mod log
 
 use ly_log::core_prelude::*;
 
+/// Event system for LY engine clients
+///
+/// crate doc: [ly_events]
 pub mod events
 {
 	pub use ly_events::*;
 }
 
+/// Window abstraction for LY engine clients
+///
+/// crate doc: [ly_window]
 pub mod window
 {
 	pub use ly_window::*;

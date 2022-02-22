@@ -1,3 +1,87 @@
+//! Event system in the LY engine
+//!
+//! The crate provides functionality to send event via "channels", inspired
+//! by rust channels. A `Sync` alternative is provided, but it is about 4 times
+//! slower (still OK fast).
+//!
+//! Event channels are instantiated for some event-type, and are read
+//! by readers that are created by those instantiated channels.
+//! In order to read events, they first need to be flushed.
+//! Once read, events are not read again.
+//!
+//! A reader has a borrow of the channel it reads, the one that created the
+//! reader. This is to ensure that the reader always has a channel to read from,
+//! and to enable a more ergonomic API.
+//!
+//! A single channel may have multiple readers. Reading an event
+//! does not consume it for other readers.
+//!
+//! ### Example event flow
+//!
+//! ```
+//! # use ly_events::EventChannel;
+//! #[derive(Debug, PartialEq, Eq, Clone)]
+//! struct TestEvent { data: usize, }
+//!
+//! let test_channel = EventChannel::<TestEvent>::new();
+//! let event = TestEvent { data: 42 };
+//! let event_clone = event.clone();
+//!
+//! let reader = test_channel.get_reader();
+//!
+//! let events = reader.read().collect::<Vec<&TestEvent>>();
+//! assert_eq!(events, Vec::<&TestEvent>::new(),
+//! 	"initial events empty");
+//!
+//! test_channel.send(event);
+//!
+//! let events = reader.read().collect::<Vec<&TestEvent>>();
+//! assert_eq!(events, Vec::<&TestEvent>::new(),
+//! 	"still emply after send");
+//!
+//! test_channel.flush();
+//!
+//! let events = reader.read().collect::<Vec<&TestEvent>>();
+//! assert_eq!(events, [&event_clone],
+//! 	"reader can read flushed event");
+//!
+//! let events = reader.read().collect::<Vec<&TestEvent>>();
+//! assert_eq!(events, Vec::<&TestEvent>::new(),
+//! 	"cannot read twice");
+//! ```
+//!
+//! ### Sync notes
+//!
+//! The [`SyncEventChannel`] is provided as [`Sync`], but it still placed on the
+//! stack unless wrapped in `Arc` or something similar. This is important for
+//! having the reader and emitting channel in different threads, keep in mind
+//! the reader has a borrow to the channel.
+//!
+//! The [`SyncEventReader`] has some synchronization methods to wait for new
+//! events, [`SyncEventReader::wait_new`], and to wait for someone else to flush
+//! the channel [`SyncEventReader::wait_flushed`].
+//!
+//! For unscoped threads this is one way to work, note the `Arc` and
+//! `wait_new()` ```
+//! # struct TestEvent { data: usize, }
+//! # use std::thread;
+//! # use std::sync::Arc;
+//! # use ly_events::SyncEventChannel;
+//! let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
+//!
+//! let c = Arc::clone(&channel);
+//! let rec1 = thread::spawn(move || {
+//! 	let reader = c.get_reader();
+//! 	loop {
+//! 		reader.wait_new();
+//! 		reader.flush_channel();
+//! 		for event in reader.read() {
+//! 			// do stuff
+//! 		}
+//! 	}
+//! });
+//! ```
+
 use core::marker::PhantomData;
 use crossbeam::sync::Unparker;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
@@ -14,6 +98,7 @@ enum ReadableEventBuffer
 	B,
 }
 
+/// Single-threaded event channel
 pub struct EventChannel<T>
 {
 	events_a: UnsafeCell<Vec<T>>,
@@ -23,12 +108,17 @@ pub struct EventChannel<T>
 	readable_buffer: UnsafeCell<ReadableEventBuffer>,
 }
 
+/// Single-threaded event reader
+///
+/// Created by [`EventChannel::get_reader`].
+/// Borrows the channel immutably upon creation.
 pub struct EventReader<'a, T>
 {
 	read_events: UnsafeCell<usize>,
 	channel: &'a EventChannel<T>,
 }
 
+/// Thread-safe event channel
 pub struct SyncEventChannel<T>
 {
 	channel: EventChannel<T>,
@@ -38,6 +128,10 @@ pub struct SyncEventChannel<T>
 	flushed_waiters: UnsafeCell<Vec<Unparker>>,
 }
 
+/// Thread-safe event reader
+///
+/// Created by [`SyncEventChannel::get_reader`].
+/// Borrows the channel immutably upon creation.
 pub struct SyncEventReader<'a, T>
 {
 	read_events: UnsafeCell<usize>,
@@ -49,6 +143,7 @@ unsafe impl<T> Sync for SyncEventChannel<T> {}
 
 impl<T> EventChannel<T>
 {
+	/// Creates empty event channel
 	pub fn new() -> EventChannel<T>
 	{
 		EventChannel {
@@ -60,6 +155,7 @@ impl<T> EventChannel<T>
 		}
 	}
 
+	/// Sends the event on the channel
 	pub fn send(&self, e: T)
 	{
 		unsafe {
@@ -76,6 +172,15 @@ impl<T> EventChannel<T>
 		}
 	}
 
+	/// Flushes events on the channel
+	///
+	/// Makes the currently sent un-flushed events readable.
+	///
+	/// This drops all previously flushed events, making them unreadable.
+	///
+	/// Is is adviced to let one of the readers initiate the flush with
+	/// [`EventReader::flush_channel`],
+	/// as they are controlling consumation of events.
 	pub fn flush(&self)
 	{
 		let readable_buffer = self.readable_buffer.get();
@@ -97,6 +202,7 @@ impl<T> EventChannel<T>
 		}
 	}
 
+	/// Creates a reader for this channel
 	pub fn get_reader(&self) -> EventReader<T>
 	{
 		EventReader {
@@ -108,7 +214,13 @@ impl<T> EventChannel<T>
 
 impl<'a, T> EventReader<'a, T>
 {
-	pub fn iter(&self) -> impl Iterator<Item = &T>
+	/// Reads all unread events from this channel
+	///
+	/// Giver an `Iterator` over the currently flushed events.
+	///
+	/// Becaus of how this is setup, it reads all flushed events, or none at all
+	/// if the flushed events have been read by this reader.
+	pub fn read(&self) -> impl Iterator<Item = &T>
 	{
 		unsafe {
 			let readable_buffer = self.channel.readable_buffer.get();
@@ -138,11 +250,16 @@ impl<'a, T> EventReader<'a, T>
 		}
 	}
 
+	/// Initiates a flush on the reader's connected channel
+	///
+	/// It is adviced to use this for flushing. Read [`EventChannel::flush`]
+	/// for a descripion of the behaviour regarding flushing.
 	pub fn flush_channel(&self) { self.channel.flush(); }
 }
 
 impl<T> SyncEventChannel<T>
 {
+	/// Creates a new thread-safe event channel
 	pub fn new() -> SyncEventChannel<T>
 	{
 		SyncEventChannel {
@@ -154,6 +271,10 @@ impl<T> SyncEventChannel<T>
 		}
 	}
 
+	/// Sends the event to the channel
+	///
+	/// This also wakes any threads waiting for new events via
+	/// [`SyncEventReader::wait_new`].
 	pub fn send(&self, e: T)
 	{
 		let _lock = self.write_mutex.lock();
@@ -163,6 +284,18 @@ impl<T> SyncEventChannel<T>
 		}
 	}
 
+	/// Flushes the channel
+	///
+	/// Makes the currently sent un-flushed events readable.
+	///
+	/// This drops all previously flushed events, making them unreadable.
+	///
+	/// This also wakes any threads waiting for a flush via
+	/// [`SyncEventReader::wait_flushed`].
+	///
+	/// Is is adviced to let one of the readers initiate the flush with
+	/// [`SyncEventReader::flush_channel`],
+	/// as they are controlling consumation of events.
 	pub fn flush(&self)
 	{
 		let _lock = self.flush_mutex.write();
@@ -172,6 +305,7 @@ impl<T> SyncEventChannel<T>
 		}
 	}
 
+	/// Creates a reader for this channel
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
 		SyncEventReader {
@@ -183,7 +317,7 @@ impl<T> SyncEventChannel<T>
 
 	// expects the write_mutex to already be locked by this thread
 	// only called from reader.wait_new()
-	pub fn has_new_events(&self) -> bool
+	fn has_new_events(&self) -> bool
 	{
 		unsafe {
 			let buffer = self.channel.readable_buffer.get();
@@ -197,6 +331,12 @@ impl<T> SyncEventChannel<T>
 
 impl<'a, T> SyncEventReader<'a, T>
 {
+	/// Reads all unread events from this channel
+	///
+	/// Giver an `Iterator` over the currently flushed events.
+	///
+	/// Becaus of how this is setup, it reads all flushed events, or none at all
+	/// if the flushed events have been read by this reader.
 	pub fn read(&self) -> impl Iterator<Item = &T>
 	{
 		let read_lock = self.channel.flush_mutex.read();
@@ -246,8 +386,19 @@ impl<'a, T> SyncEventReader<'a, T>
 		}
 	}
 
+	/// Initiates a flush on the reader's connected channel
+	///
+	/// It is adviced to use this for flushing. Read [`EventChannel::flush`]
+	/// for a descripion of the behaviour regarding flushing.
 	pub fn flush_channel(&self) { self.channel.flush(); }
 
+	/// Waits for un-flushed events to be present
+	///
+	/// If there already are un-flushed events, this returns directly,
+	/// as there are new events that can be flushed.
+	///
+	/// If no events are present, the thread will halt and wake when the
+	/// next [`SyncEventChannel::send`] occurs.
 	pub fn wait_new(&self)
 	{
 		let _lock = self.channel.write_mutex.lock();
@@ -262,6 +413,16 @@ impl<'a, T> SyncEventReader<'a, T>
 		}
 	}
 
+	/// Waits for flushed un-read events to be present
+	///
+	/// This returns directly if the read has not read the currently flushed
+	/// events
+	///
+	/// If the reader has read current events, it will halt and wake when the
+	/// next [`SyncEventChannel::flush`] occurs.
+	///
+	/// Note: This may lead to a deadlock if this thread is responsible for
+	/// flushing, but you already knew that.
 	pub fn wait_flushed(&self)
 	{
 		let _lock = self.channel.flush_mutex.write();
@@ -314,13 +475,13 @@ mod tests
 		let event1 = TestEvent { data: 1 };
 
 		let reader = test_channel.get_reader();
-		let events = reader.iter().collect::<Vec<&TestEvent>>();
+		let events = reader.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(events, Vec::<&TestEvent>::new(), "initial events empty");
 
 		test_channel.send(event0);
 		test_channel.flush();
 
-		let events = reader.iter().collect::<Vec<&TestEvent>>();
+		let events = reader.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
 			[&TestEvent { data: 0 }],
@@ -330,7 +491,7 @@ mod tests
 		test_channel.send(event1);
 		test_channel.flush();
 
-		let events = reader.iter().collect::<Vec<&TestEvent>>();
+		let events = reader.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
 			[&TestEvent { data: 1 }],
@@ -338,14 +499,14 @@ mod tests
 		);
 
 		let reader2 = test_channel.get_reader();
-		let events = reader2.iter().collect::<Vec<&TestEvent>>();
+		let events = reader2.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
 			[&TestEvent { data: 1 }],
 			"We only retain the events most recently flushed, reader2 reads after event0 has been \
 			 dropped"
 		);
-		let events = reader2.iter().collect::<Vec<&TestEvent>>();
+		let events = reader2.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
 			Vec::<&TestEvent>::new(),
@@ -353,7 +514,7 @@ mod tests
 		);
 
 		test_channel.flush();
-		let events = reader2.iter().collect::<Vec<&TestEvent>>();
+		let events = reader2.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(events, Vec::<&TestEvent>::new());
 	}
 

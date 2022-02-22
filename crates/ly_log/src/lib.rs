@@ -1,3 +1,19 @@
+//! Logging system in the LY engine
+//!
+//! It contains macros to log format strings via a logging thread
+//!
+//! The logger must be initiaized with the [log_init] function
+//!
+//! There are five logging levels/macros, listed in increasing severity:
+//! `trace!`, `debug!`, `info!`, `warning!`, `error!`.
+//!
+//! Which log level is used is decided at compile time with the following
+//! features, with each feature also disabling all logs of a lower severity:
+//! - strip_trace
+//! - strip_debug
+//! - strip_info
+//! - strip_warning
+
 pub use colored::Colorize;
 use crossbeam::channel;
 use std::fmt;
@@ -5,11 +21,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use thread_local::ThreadLocal;
 
+/// exports intended for clients outside the LY engine
 pub mod prelude
 {
 	pub use super::{debug, error, info, log_init, trace, warning};
 }
 
+/// exports intended for the LY engine
 pub mod core_prelude
 {
 	pub use super::{core_debug, core_error, core_info, core_trace, core_warning};
@@ -100,6 +118,7 @@ fn init_channel() -> LogSender
 	tx
 }
 
+/// initializes the global logger with it's own logging thread
 pub fn log_init()
 {
 	static INITIALIZED: AtomicBool = AtomicBool::new(false);
