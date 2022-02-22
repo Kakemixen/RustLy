@@ -33,6 +33,12 @@ use ly_log::core_prelude::*;
 
 /// Event system for LY engine clients
 ///
+/// The crate provides functionality to send event via "channels"
+/// and event signals to synchonize threads.
+///
+/// The most important module is [events::channel], which is probably why you
+/// are here.
+///
 /// crate doc: [ly_events]
 pub mod events
 {

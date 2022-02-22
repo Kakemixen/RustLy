@@ -15,12 +15,14 @@ impl SignalEvent
 		}
 	}
 
+	/// Signal waiting threads to wake
 	pub fn signal(&self)
 	{
 		let mut waiters = self.waiters.lock();
 		signal_waiters(&mut waiters);
 	}
 
+	/// Wait for signal
 	pub fn wait(&self)
 	{
 		let p = add_waiter(&mut self.waiters.lock());
@@ -28,8 +30,7 @@ impl SignalEvent
 	}
 }
 
-// internal convenience function
-pub fn signal_waiters(waiters: &mut Vec<Unparker>)
+pub(crate) fn signal_waiters(waiters: &mut Vec<Unparker>)
 {
 	for waiter in waiters.iter() {
 		waiter.unpark();
@@ -37,8 +38,7 @@ pub fn signal_waiters(waiters: &mut Vec<Unparker>)
 	waiters.clear();
 }
 
-// internal convenience function
-pub fn add_waiter(waiters: &mut Vec<Unparker>) -> Parker
+pub(crate) fn add_waiter(waiters: &mut Vec<Unparker>) -> Parker
 {
 	let p = Parker::new();
 	let u = p.unparker().clone();

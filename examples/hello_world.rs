@@ -9,7 +9,7 @@ fn main()
 	log_init();
 	let window = window::create_window();
 
-	let channel = Arc::new(events::SyncEventChannel::<window::LyWindowEvent>::new());
+	let channel = Arc::new(events::channel::SyncEventChannel::<window::LyWindowEvent>::new());
 
 	let c = Arc::clone(&channel);
 	thread::spawn(move || {

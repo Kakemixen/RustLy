@@ -68,7 +68,7 @@ pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 }
 
 pub fn get_sync_forwarding_event_loop(
-	channel: Arc<events::SyncEventChannel<LyWindowEvent>>,
+	channel: Arc<events::channel::SyncEventChannel<LyWindowEvent>>,
 ) -> Box<dyn EventHandler>
 {
 	Box::new(

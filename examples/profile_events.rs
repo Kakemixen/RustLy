@@ -13,7 +13,7 @@ const NUM_EVENTS: usize = 10000000;
 
 fn run() -> usize
 {
-	let channel = Arc::new(events::SyncEventChannel::<MyEvent>::new());
+	let channel = Arc::new(events::channel::SyncEventChannel::<MyEvent>::new());
 	let reader = channel.get_reader();
 	let mut total: usize = 0;
 
