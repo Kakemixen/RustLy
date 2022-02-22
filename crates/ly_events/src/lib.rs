@@ -175,9 +175,22 @@ impl<T> SyncEventChannel<T>
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
 		SyncEventReader {
-			read_events: UnsafeCell::new(0),
+			read_events: UnsafeCell::new(1), // avoid stupid stuff when read=0
 			channel: self,
 			_not_send_sync: PhantomData,
+		}
+	}
+
+	// expects the write_mutex to already be locked by this thread
+	// only called from reader.wait_new()
+	pub fn has_new_events(&self) -> bool
+	{
+		unsafe {
+			let buffer = self.channel.readable_buffer.get();
+			match *buffer {
+				ReadableEventBuffer::A => !(*self.channel.events_b.get()).is_empty(),
+				ReadableEventBuffer::B => !(*self.channel.events_a.get()).is_empty(),
+			}
 		}
 	}
 }
@@ -187,46 +200,49 @@ impl<'a, T> SyncEventReader<'a, T>
 	pub fn read(&self) -> impl Iterator<Item = &T>
 	{
 		let read_lock = self.channel.flush_mutex.read();
+
+		if !self.has_unread() {
+			return EventIterator {
+				read_lock,
+				iterator: [].iter(),
+			};
+		}
+
 		let channel = &self.channel.channel;
 		unsafe {
 			let readable_buffer = channel.readable_buffer.get();
 			let read_events = self.read_events.get();
-			match *readable_buffer {
+			let iterator = match *readable_buffer {
 				ReadableEventBuffer::A => {
 					let start_idx_a = *channel.start_idx_a.get();
-					if *read_events > start_idx_a {
-						EventIterator {
-							read_lock,
-							iterator: [].iter(),
-						}
-					}
-					else {
-						*read_events = start_idx_a + 1;
-						let iterator = (*channel.events_a.get()).iter();
-						EventIterator {
-							read_lock,
-							iterator,
-						}
-					}
+					*read_events = start_idx_a + 1;
+					(*channel.events_a.get()).iter()
 				}
 				ReadableEventBuffer::B => {
 					let start_idx_b = *channel.start_idx_b.get();
-					if *read_events > start_idx_b {
-						EventIterator {
-							read_lock,
-							iterator: [].iter(),
-						}
-					}
-					else {
-						*read_events = start_idx_b + 1;
-						let iterator = (*channel.events_b.get()).iter();
-						EventIterator {
-							read_lock,
-							iterator,
-						}
-					}
+					*read_events = start_idx_b + 1;
+					(*channel.events_b.get()).iter()
 				}
+			};
+			EventIterator {
+				read_lock,
+				iterator,
 			}
+		}
+	}
+
+	// expects write_mutex to already be locked
+	fn has_unread(&self) -> bool
+	{
+		let channel = &self.channel.channel;
+		unsafe {
+			let readable_buffer = channel.readable_buffer.get();
+			let read_events = self.read_events.get();
+			let start_idx = match *readable_buffer {
+				ReadableEventBuffer::A => channel.start_idx_a.get(),
+				ReadableEventBuffer::B => channel.start_idx_b.get(),
+			};
+			*read_events <= *start_idx
 		}
 	}
 
@@ -235,6 +251,10 @@ impl<'a, T> SyncEventReader<'a, T>
 	pub fn wait_new(&self)
 	{
 		let _lock = self.channel.write_mutex.lock();
+		if self.channel.has_new_events() {
+			return;
+		}
+
 		unsafe {
 			let p = event_signal::add_waiter(&mut *self.channel.new_event_waiters.get());
 			drop(_lock);
@@ -245,6 +265,10 @@ impl<'a, T> SyncEventReader<'a, T>
 	pub fn wait_flushed(&self)
 	{
 		let _lock = self.channel.flush_mutex.write();
+		if self.has_unread() {
+			return;
+		}
+
 		unsafe {
 			let p = event_signal::add_waiter(&mut *self.channel.flushed_waiters.get());
 			drop(_lock);
@@ -381,7 +405,6 @@ mod tests
 		let total = Arc::clone(&total_loc);
 		let c = Arc::clone(&channel);
 		let emitter1 = thread::spawn(move || {
-			thread::sleep(Duration::from_millis(2));
 			for i in 1..11 {
 				c.send(());
 				thread::sleep(Duration::from_millis(2));
@@ -417,7 +440,7 @@ mod tests
 		let total = Arc::clone(&total_loc);
 		let c = Arc::clone(&channel);
 		let emitter1 = thread::spawn(move || {
-			thread::sleep(Duration::from_millis(5));
+			thread::sleep(Duration::from_millis(5)); // TODO shouldn't need
 			for i in 1..11 {
 				c.send(());
 				thread::sleep(Duration::from_millis(5));
