@@ -17,11 +17,8 @@ impl SignalEvent
 
 	pub fn signal(&self)
 	{
-		println!("locking waiters");
 		let mut waiters = self.waiters.lock();
-		println!("locked waiters");
 		for waiter in waiters.iter() {
-			println!("unparking");
 			waiter.unpark();
 		}
 		waiters.clear();
@@ -34,7 +31,6 @@ impl SignalEvent
 		{
 			self.waiters.lock().push(u);
 		}
-		println!("parking");
 		p.park();
 	}
 }
