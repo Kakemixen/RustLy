@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use crossbeam::sync::{Parker, Unparker};
+use crossbeam::sync::Unparker;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
