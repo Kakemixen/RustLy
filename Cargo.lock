@@ -436,6 +436,7 @@ version = "0.1.0"
 dependencies = [
  "colored",
  "crossbeam",
+ "parking_lot 0.12.0",
  "thread_local",
 ]
 

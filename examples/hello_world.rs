@@ -24,18 +24,13 @@ fn main()
 			// wait_new solves it here, but not root cause
 			reader.wait_new();
 
-			info!("flushing!");
 			reader.flush_channel();
 			for event in reader.read() {
 				match event {
 					window::LyWindowEvent::WindowClose => should_exit = true,
-					window::LyWindowEvent::MousePressed(key) => {
-						info!("receiving pressed {}", key)
+					e => {
+						info!("recieved {:?}", e);
 					}
-					window::LyWindowEvent::MouseReleased(key) => {
-						info!("receiving released {}", key)
-					}
-					_ => (),
 				}
 			}
 			if should_exit {

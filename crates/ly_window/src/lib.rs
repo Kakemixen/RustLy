@@ -7,6 +7,7 @@ use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::window::Window;
 
+#[derive(Debug)]
 pub enum LyWindowEvent
 {
 	MouseMove(i32, i32),
@@ -79,29 +80,27 @@ pub fn get_sync_forwarding_event_loop(
 				..
 			} => match event {
 				event::WindowEvent::CloseRequested => {
-					core_info!("The close button was pressed; stopping");
+					core_info!("closing");
+					log_die("The close button was pressed; stopping".to_string());
+					core_info!("closing");
 					channel.send(LyWindowEvent::WindowClose);
 					*control_flow = ControlFlow::Exit;
 				}
 				event::WindowEvent::MouseInput { button, state, .. } => match state {
 					event::ElementState::Pressed => match button {
 						event::MouseButton::Left => {
-							core_info!("sending left press");
 							channel.send(LyWindowEvent::MousePressed(0));
 						}
 						event::MouseButton::Right => {
-							core_info!("sending right press");
 							channel.send(LyWindowEvent::MousePressed(1));
 						}
 						_ => (),
 					},
 					event::ElementState::Released => match button {
 						event::MouseButton::Left => {
-							core_info!("sending left release");
 							channel.send(LyWindowEvent::MouseReleased(0));
 						}
 						event::MouseButton::Right => {
-							core_info!("sending right release");
 							channel.send(LyWindowEvent::MouseReleased(1));
 						}
 						_ => (),

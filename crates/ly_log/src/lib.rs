@@ -2,7 +2,7 @@
 //!
 //! It contains macros to log format strings via a logging thread
 //!
-//! The logger must be initiaized with the [log_init] function
+//! The logger must be initiaized with the [`log_init`] function
 //!
 //! There are five logging levels/macros, listed in increasing severity:
 //! `trace!`, `debug!`, `info!`, `warning!`, `error!`.
@@ -13,11 +13,30 @@
 //! - strip_debug
 //! - strip_info
 //! - strip_warning
+//!
+//! Logs will indicate if they blocked the sender side.
+//! Can be dissallowed with the feature `dissallow_blocking`,
+//! in which case blocking events will panic.
+//!
+//! ### Engine API
+//!
+//! The engine should use the [core_prelude], which will export
+//! macros with the `core_` prefix, and indicate that the log
+//! originated from the engine.
+//!
+//! The logger should be cleaned up with the [`log_die`] function,
+//! but it is not strictly necessary. It sends a kill command,
+//! and waits for the logger to finish all currently received logs.
+//! If the main threads exit without calling this, logs will be lost.
+//! Make sure all threads generating logs are stopped before calling
+//! this method.
 
 pub use colored::Colorize;
 use crossbeam::channel;
+use parking_lot::{Condvar, Mutex};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use thread_local::ThreadLocal;
 
@@ -30,7 +49,7 @@ pub mod prelude
 /// exports intended for the LY engine
 pub mod core_prelude
 {
-	pub use super::{core_debug, core_error, core_info, core_trace, core_warning};
+	pub use super::{core_debug, core_error, core_info, core_trace, core_warning, log_die};
 }
 
 pub enum LogLevel
@@ -55,7 +74,6 @@ struct LogEvent
 enum LogEnum
 {
 	Msg(LogEvent),
-	#[cfg(feature = "disallow_blocking")]
 	Kill(String),
 }
 
@@ -93,10 +111,35 @@ fn print_log_event(event: LogEvent)
 	);
 }
 
+type CondPair = Arc<(Mutex<bool>, Condvar)>;
+
+fn print_log_die(msg: String, condpair: CondPair)
+{
+	let levelstr = "INFO".green();
+	let corestr = " LY".magenta();
+
+	println!(
+		"{}",
+		format!(
+			"[{:7}{}] Stopping log thread - {}",
+			levelstr,
+			corestr,
+			msg.replace("\n", &format!("\n[   -   {}] ", corestr))
+		)
+	);
+	let (lock, cvar) = &*condpair;
+	let mut finished = lock.lock();
+	*finished = true;
+	// We notify the condvar that the value has changed.
+	cvar.notify_one();
+}
+
 type LogSender = channel::Sender<LogEnum>;
-fn init_channel() -> LogSender
+fn init_channel() -> (LogSender, CondPair)
 {
 	let (tx, rx) = channel::bounded(6);
+	let pair = Arc::new((Mutex::new(false), Condvar::new()));
+	let pair2 = Arc::clone(&pair);
 
 	thread::Builder::new()
 		.name("LogThread".to_string())
@@ -106,18 +149,18 @@ fn init_channel() -> LogSender
 					LogEnum::Msg(event) => {
 						print_log_event(event);
 					}
-					#[cfg(feature = "disallow_blocking")]
 					LogEnum::Kill(msg) => {
-						println!("{}: {}", "Logging abort reason".red(), msg);
-						std::process::abort();
+						print_log_die(msg, pair2);
+						break;
 					}
 				};
 			}
 		})
 		.unwrap();
-	tx
+	(tx, pair)
 }
 
+// TODO make only public in engine once Application is up and running
 /// initializes the global logger with it's own logging thread
 pub fn log_init()
 {
@@ -127,11 +170,21 @@ pub fn log_init()
 	}
 	INITIALIZED.store(true, Ordering::Relaxed);
 
-	let tx = init_channel();
-	let logger_box = Box::new(Logger::new(tx));
+	let logger_box = Box::new(Logger::new());
 
 	unsafe {
 		LOGGER = Box::leak(logger_box);
+	}
+}
+
+/// Stops the logger and cleans up
+///
+/// This will make all following calls to logging panic
+/// make sure you have cleaned up all threads when this is called
+pub fn log_die(message: String)
+{
+	unsafe {
+		LOGGER.log_die(message);
 	}
 }
 
@@ -161,6 +214,7 @@ pub fn __private_log(
 trait Log: Sync
 {
 	fn log(&self, event: LogEvent);
+	fn log_die(&self, message: String);
 }
 
 struct EmptyLogger;
@@ -168,6 +222,7 @@ struct EmptyLogger;
 impl Log for EmptyLogger
 {
 	fn log(&self, _event: LogEvent) {}
+	fn log_die(&self, _msg: String) {}
 }
 
 static mut LOGGER: &dyn Log = &EmptyLogger;
@@ -176,15 +231,18 @@ struct Logger
 {
 	transmitter: ThreadLocal<LogSender>,
 	tx_main: LogSender,
+	condpair: CondPair,
 }
 
 impl Logger
 {
-	fn new(tx: LogSender) -> Self
+	fn new() -> Self
 	{
+		let (tx, condpair) = init_channel();
 		let logger = Logger {
 			transmitter: ThreadLocal::new(),
 			tx_main: tx,
+			condpair,
 		};
 		logger
 	}
@@ -205,18 +263,40 @@ impl Log for Logger
 					};
 					tx.send(LogEnum::Msg(blocking_event)).unwrap();
 				}
+				#[cfg(not(feature = "disallow_blocking"))]
+				channel::TrySendError::Full(LogEnum::Kill(_)) => {
+					panic!("Could not send log kill event, this really should not happen!");
+				}
 				#[cfg(feature = "disallow_blocking")]
 				channel::TrySendError::Full(LogEnum::Msg(e)) => {
 					tx.send(LogEnum::Kill("Full channel".to_string())).unwrap();
+					self.log_die("Disallowed blocking, killed");
+					panic!();
 				}
 				#[cfg(feature = "disallow_blocking")]
 				channel::TrySendError::Full(LogEnum::Kill(e)) => {
 					tx.send(LogEnum::Kill(e)).unwrap();
+					self.log_die("Disallowed blocking, killed resend");
+					panic!();
 				}
 				channel::TrySendError::Disconnected(_) => {
 					panic!("Disconnected logger, can't send logs");
 				}
 			};
+		}
+	}
+
+	fn log_die(&self, msg: String)
+	{
+		let tx = self.transmitter.get_or(|| self.tx_main.clone());
+		if let Err(channel::SendError(_)) = tx.send(LogEnum::Kill(msg)) {
+			panic!("Disconnected logger, could not send log_die event, this should not happen!");
+		}
+		let (lock, cvar) = &*self.condpair;
+		let mut finished = lock.lock();
+		// We notify the condvar that the value has changed.
+		while !*finished {
+			cvar.wait(&mut finished);
 		}
 	}
 }
