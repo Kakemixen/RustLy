@@ -3,6 +3,7 @@ use crossbeam::sync::Unparker;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::channel::{EventChannel, ReadableEventBuffer};
 use crate::event_signal;
@@ -46,6 +47,7 @@ pub struct SyncEventChannel<T>
 	flush_mutex: RwLock<()>,
 	new_event_waiters: UnsafeCell<Vec<Unparker>>,
 	flushed_waiters: UnsafeCell<Vec<Unparker>>,
+	writers: UnsafeCell<AtomicUsize>,
 }
 
 /// Thread-safe event writer
@@ -82,6 +84,7 @@ impl<T> SyncEventChannel<T>
 			flush_mutex: RwLock::new(()),
 			new_event_waiters: UnsafeCell::new(Vec::new()),
 			flushed_waiters: UnsafeCell::new(Vec::new()),
+			writers: UnsafeCell::new(AtomicUsize::new(0)),
 		}
 	}
 
@@ -122,6 +125,10 @@ impl<T> SyncEventChannel<T>
 	/// Creates a writer for this channel
 	pub fn get_writer(&self) -> SyncEventWriter<T>
 	{
+		unsafe {
+			let writers = self.writers.get();
+			(*writers).fetch_add(1, Ordering::Relaxed);
+		}
 		SyncEventWriter {
 			channel: self,
 			_not_send_sync: PhantomData,
@@ -150,6 +157,15 @@ impl<T> SyncEventChannel<T>
 			}
 		}
 	}
+
+	fn has_writers(&self) -> bool
+	{
+		unsafe {
+			let writers = self.writers.get();
+			println!("num writers: {}", (*writers).load(Ordering::Relaxed));
+			(*writers).load(Ordering::Relaxed) == 0
+		}
+	}
 }
 
 impl<'a, T> SyncEventWriter<'a, T>
@@ -159,6 +175,22 @@ impl<'a, T> SyncEventWriter<'a, T>
 	/// This also wakes any threads waiting for new events via
 	/// [`SyncEventReader::wait_new`].
 	pub fn send(&self, event: T) { self.channel.send(event); }
+}
+
+impl<'a, T> Drop for SyncEventWriter<'a, T>
+{
+	fn drop(&mut self)
+	{
+		unsafe {
+			let writers = self.channel.writers.get();
+			(*writers).fetch_sub(1, Ordering::Relaxed);
+			if (*writers).load(Ordering::Relaxed) == 0 {
+				let _lock = self.channel.write_mutex.lock();
+				event_signal::signal_waiters(&mut *self.channel.new_event_waiters.get());
+				event_signal::signal_waiters(&mut *self.channel.flushed_waiters.get());
+			}
+		}
+	}
 }
 
 impl<'a, T> SyncEventReader<'a, T>
@@ -268,6 +300,8 @@ impl<'a, T> SyncEventReader<'a, T>
 			p.park();
 		}
 	}
+
+	pub fn channel_has_writers(&self) -> bool { self.channel.has_writers() }
 }
 
 struct SyncEventIterator<'a, T>

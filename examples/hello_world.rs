@@ -15,7 +15,7 @@ fn main()
 
 	//let cw = Arc::clone(&channel_window);
 	let ci = Arc::clone(&channel_input);
-	thread::Builder::new()
+	let handle = thread::Builder::new()
 		.name("Logging thread".to_string())
 		.spawn(move || {
 			//let reader_w = cw.get_reader();
@@ -36,10 +36,20 @@ fn main()
 						}
 					}
 				}
+				if !reader_i.channel_has_writers() {
+					break;
+				}
 			}
 		})
 		.unwrap();
 
-	let event_handler = window::get_sync_forwarding_event_loop(channel_window, channel_input, None); // When main ends, all threads are killed
-	window.run(event_handler);
+	let writer_window = channel_window.get_writer();
+	let writer_input = channel_input.get_writer();
+	let event_handler = window::get_sync_forwarding_event_loop(writer_window, writer_input);
+	window.run(
+		event_handler,
+		Box::new(move || {
+			let _x = handle.join();
+		}),
+	);
 }

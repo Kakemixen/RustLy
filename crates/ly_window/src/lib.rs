@@ -3,16 +3,20 @@
 mod winit_converters;
 use winit_converters as converters;
 
-use ly_events::channel::SyncEventChannel;
+use ly_events::channel::SyncEventWriter;
 use ly_events::types::{InputEvent, WindowEvent};
 use ly_log::core_prelude::*;
-use std::sync::Arc;
 use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
+use winit::platform::run_return::EventLoopExtRunReturn;
 use winit::window::Window;
 
-pub trait EventHandler =
-	'static + FnMut(event::Event<'_, ()>, &EventLoopWindowTarget<()>, &mut ControlFlow);
+// If moving back to event_loop.run(), this is correct EventHandler
+//pub trait EventHandler =
+//	'static + FnMut(event::Event<'_, ()>, &EventLoopWindowTarget<()>, &mut
+// ControlFlow);
+
+pub trait EventHandler = FnMut(event::Event<'_, ()>, &EventLoopWindowTarget<()>, &mut ControlFlow);
 
 pub struct LyWindow
 {
@@ -37,11 +41,12 @@ pub fn create_window() -> LyWindow
 
 impl LyWindow
 {
-	pub fn run<E>(self, event_handler: E)
+	pub fn run<E>(mut self, event_handler: E, end_handler: Box<dyn FnOnce() -> ()>)
 	where
 		E: EventHandler,
 	{
-		self.event_loop.run(event_handler);
+		self.event_loop.run_return(event_handler);
+		end_handler();
 	}
 }
 
@@ -61,16 +66,13 @@ pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 	)
 }
 
-pub fn get_sync_forwarding_event_loop(
-	channel_window: Arc<SyncEventChannel<WindowEvent>>,
-	channel_input: Arc<SyncEventChannel<InputEvent>>,
-	end_handler: Option<Box<dyn Fn() -> ()>>,
-) -> Box<dyn EventHandler>
+pub fn get_sync_forwarding_event_loop<'a>(
+	writer_window: SyncEventWriter<'a, WindowEvent>,
+	writer_input: SyncEventWriter<'a, InputEvent>,
+) -> Box<dyn EventHandler + 'a>
 {
-	Box::new(move |event, _, control_flow: &mut ControlFlow| {
-		let writer_window = channel_window.get_writer();
-		let writer_input = channel_input.get_writer();
-		match event {
+	Box::new(
+		move |event, _, control_flow: &mut ControlFlow| match event {
 			event::Event::WindowEvent {
 				event,
 				window_id: _winit_window_id,
@@ -79,10 +81,6 @@ pub fn get_sync_forwarding_event_loop(
 				event::WindowEvent::CloseRequested => {
 					core_info!("closing");
 					writer_window.send(WindowEvent::WindowClose);
-					match &end_handler {
-						None => (),
-						Some(func) => func(),
-					};
 					log_die("The close button was pressed; stopping".to_string());
 					*control_flow = ControlFlow::Exit;
 				}
@@ -105,8 +103,8 @@ pub fn get_sync_forwarding_event_loop(
 			},
 			event::Event::MainEventsCleared => {}
 			_ => (),
-		}
-	})
+		},
+	)
 }
 
 #[cfg(test)]
