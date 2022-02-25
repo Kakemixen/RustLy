@@ -67,8 +67,10 @@ pub fn get_sync_forwarding_event_loop(
 	end_handler: Option<Box<dyn Fn() -> ()>>,
 ) -> Box<dyn EventHandler>
 {
-	Box::new(
-		move |event, _, control_flow: &mut ControlFlow| match event {
+	Box::new(move |event, _, control_flow: &mut ControlFlow| {
+		let writer_window = channel_window.get_writer();
+		let writer_input = channel_input.get_writer();
+		match event {
 			event::Event::WindowEvent {
 				event,
 				window_id: _winit_window_id,
@@ -76,7 +78,7 @@ pub fn get_sync_forwarding_event_loop(
 			} => match event {
 				event::WindowEvent::CloseRequested => {
 					core_info!("closing");
-					channel_window.send(WindowEvent::WindowClose);
+					writer_window.send(WindowEvent::WindowClose);
 					match &end_handler {
 						None => (),
 						Some(func) => func(),
@@ -85,13 +87,13 @@ pub fn get_sync_forwarding_event_loop(
 					*control_flow = ControlFlow::Exit;
 				}
 				event::WindowEvent::MouseInput { button, state, .. } => {
-					channel_input.send(converters::convert_mouse_button(button, state));
+					writer_input.send(converters::convert_mouse_button(button, state));
 				}
 				event::WindowEvent::CursorMoved { position, .. } => {
-					channel_input.send(converters::convert_mouse_move(position));
+					writer_input.send(converters::convert_mouse_move(position));
 				}
 				event::WindowEvent::KeyboardInput { input, .. } => {
-					channel_input.send(converters::convert_keyboard_input(input));
+					writer_input.send(converters::convert_keyboard_input(input));
 				}
 				_ => (),
 			},
@@ -103,8 +105,8 @@ pub fn get_sync_forwarding_event_loop(
 			},
 			event::Event::MainEventsCleared => {}
 			_ => (),
-		},
-	)
+		}
+	})
 }
 
 #[cfg(test)]

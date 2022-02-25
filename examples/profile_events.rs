@@ -15,12 +15,13 @@ fn run() -> usize
 {
 	let channel = Arc::new(events::channel::SyncEventChannel::<MyEvent>::new());
 	let reader = channel.get_reader();
+	let writer = channel.get_writer();
 	let mut total: usize = 0;
 
 	let time = Instant::now();
 	for i in 0..NUM_EVENTS {
 		let event = MyEvent { num: i };
-		channel.send(event);
+		writer.send(event);
 
 		if i % READ_BATCH == 0 {
 			channel.flush();

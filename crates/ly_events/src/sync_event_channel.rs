@@ -48,6 +48,16 @@ pub struct SyncEventChannel<T>
 	flushed_waiters: UnsafeCell<Vec<Unparker>>,
 }
 
+/// Thread-safe event writer
+///
+/// Created by [`SyncEventChannel::get_writer`].
+/// Borrows the channel immutably upon creation.
+pub struct SyncEventWriter<'a, T>
+{
+	channel: &'a SyncEventChannel<T>,
+	_not_send_sync: PhantomData<*const ()>, // to explicitly say it cannot be sent
+}
+
 /// Thread-safe event reader
 ///
 /// Created by [`SyncEventChannel::get_reader`].
@@ -79,7 +89,7 @@ impl<T> SyncEventChannel<T>
 	///
 	/// This also wakes any threads waiting for new events via
 	/// [`SyncEventReader::wait_new`].
-	pub fn send(&self, e: T)
+	fn send(&self, e: T)
 	{
 		let _lock = self.write_mutex.lock();
 		self.channel.send(e);
@@ -109,6 +119,15 @@ impl<T> SyncEventChannel<T>
 		}
 	}
 
+	/// Creates a writer for this channel
+	pub fn get_writer(&self) -> SyncEventWriter<T>
+	{
+		SyncEventWriter {
+			channel: self,
+			_not_send_sync: PhantomData,
+		}
+	}
+
 	/// Creates a reader for this channel
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
@@ -131,6 +150,15 @@ impl<T> SyncEventChannel<T>
 			}
 		}
 	}
+}
+
+impl<'a, T> SyncEventWriter<'a, T>
+{
+	/// Sends the event to the channel
+	///
+	/// This also wakes any threads waiting for new events via
+	/// [`SyncEventReader::wait_new`].
+	pub fn send(&self, event: T) { self.channel.send(event); }
 }
 
 impl<'a, T> SyncEventReader<'a, T>
@@ -244,7 +272,7 @@ impl<'a, T> SyncEventReader<'a, T>
 
 struct SyncEventIterator<'a, T>
 {
-	#[allow(dead_code)]
+	#[allow(dead_code)] // keep lock alive while iterating
 	read_lock: RwLockReadGuard<'a, ()>,
 	iterator: Iter<'a, T>,
 }
