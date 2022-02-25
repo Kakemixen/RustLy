@@ -7,6 +7,7 @@
 
 mod event_channel;
 mod event_signal;
+pub mod events;
 mod sync_event_channel;
 
 /// Module for sending signal events to waiting threads
