@@ -5,7 +5,7 @@ use ly_input::{Key, MouseButton};
 #[derive(Debug)]
 pub enum InputEvent
 {
-	MouseMove(i32, i32),
+	MouseMove(f64, f64),
 	MousePressed(MouseButton),
 	MouseReleased(MouseButton),
 	KeyPressed(Key),

@@ -189,4 +189,5 @@ pub enum Key
 	Copy,
 	Paste,
 	Cut,
+	Other(u32),
 }

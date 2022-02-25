@@ -1,8 +1,10 @@
 #![feature(trait_alias)]
 
+mod winit_converters;
+use winit_converters as converters;
+
 use ly_events::channel::SyncEventChannel;
 use ly_events::types::{InputEvent, WindowEvent};
-use ly_input::{Key, MouseButton};
 use ly_log::core_prelude::*;
 use std::sync::Arc;
 use winit::event;
@@ -82,26 +84,15 @@ pub fn get_sync_forwarding_event_loop(
 					log_die("The close button was pressed; stopping".to_string());
 					*control_flow = ControlFlow::Exit;
 				}
-				event::WindowEvent::MouseInput { button, state, .. } => match state {
-					event::ElementState::Pressed => match button {
-						event::MouseButton::Left => {
-							channel_input.send(InputEvent::MousePressed(MouseButton::Left));
-						}
-						event::MouseButton::Right => {
-							channel_input.send(InputEvent::MousePressed(MouseButton::Right));
-						}
-						_ => (),
-					},
-					event::ElementState::Released => match button {
-						event::MouseButton::Left => {
-							channel_input.send(InputEvent::MouseReleased(MouseButton::Left));
-						}
-						event::MouseButton::Right => {
-							channel_input.send(InputEvent::MouseReleased(MouseButton::Right));
-						}
-						_ => (),
-					},
-				},
+				event::WindowEvent::MouseInput { button, state, .. } => {
+					channel_input.send(converters::convert_mouse_button(button, state));
+				}
+				event::WindowEvent::CursorMoved { position, .. } => {
+					channel_input.send(converters::convert_mouse_move(position));
+				}
+				event::WindowEvent::KeyboardInput { input, .. } => {
+					channel_input.send(converters::convert_keyboard_input(input));
+				}
 				_ => (),
 			},
 			event::Event::DeviceEvent {
