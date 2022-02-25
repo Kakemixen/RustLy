@@ -45,6 +45,14 @@ pub mod events
 	pub use ly_events::*;
 }
 
+/// Input types for LY engine clients
+///
+/// crate doc: [ly_input]
+pub mod input
+{
+	pub use ly_input::*;
+}
+
 /// Window abstraction for LY engine clients
 ///
 /// crate doc: [ly_window]

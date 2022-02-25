@@ -10,3 +10,4 @@ winit = "0.26.1"
 
 ly_events = { path = "../ly_events" }
 ly_log = { path = "../ly_log" }
+ly_input = { path = "../ly_input" }

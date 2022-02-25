@@ -427,8 +427,13 @@ name = "ly_events"
 version = "0.1.0"
 dependencies = [
  "crossbeam",
+ "ly_input",
  "parking_lot 0.12.0",
 ]
+
+[[package]]
+name = "ly_input"
+version = "0.1.0"
 
 [[package]]
 name = "ly_log"
@@ -445,6 +450,7 @@ name = "ly_window"
 version = "0.1.0"
 dependencies = [
  "ly_events",
+ "ly_input",
  "ly_log",
  "winit",
 ]
@@ -743,6 +749,7 @@ name = "rustly"
 version = "0.1.0"
 dependencies = [
  "ly_events",
+ "ly_input",
  "ly_log",
  "ly_window",
 ]
