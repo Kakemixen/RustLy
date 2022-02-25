@@ -1,7 +1,7 @@
 #![feature(trait_alias)]
 
 use ly_events::channel::SyncEventChannel;
-use ly_events::events::{InputEvent, WindowEvent};
+use ly_events::types::{InputEvent, WindowEvent};
 use ly_log::core_prelude::*;
 use std::sync::Arc;
 use winit::event;

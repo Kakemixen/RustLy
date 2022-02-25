@@ -7,7 +7,7 @@
 
 mod event_channel;
 mod event_signal;
-pub mod events;
+mod event_types;
 mod sync_event_channel;
 
 /// Module for sending signal events to waiting threads
@@ -107,6 +107,11 @@ pub mod channel
 {
 	pub use super::event_channel::*;
 	pub use super::sync_event_channel::*;
+}
+
+pub mod types
+{
+	pub use super::event_types::*;
 }
 
 #[cfg(test)]

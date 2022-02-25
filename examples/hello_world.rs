@@ -1,4 +1,4 @@
-use rustly::events::events::{InputEvent, WindowEvent};
+use rustly::events::types::{InputEvent, WindowEvent};
 use rustly::log::*;
 use rustly::{events, window};
 use std::sync::Arc;
