@@ -162,8 +162,7 @@ impl<T> SyncEventChannel<T>
 	{
 		unsafe {
 			let writers = self.writers.get();
-			println!("num writers: {}", (*writers).load(Ordering::Relaxed));
-			(*writers).load(Ordering::Relaxed) == 0
+			(*writers).load(Ordering::Relaxed) != 0
 		}
 	}
 }
