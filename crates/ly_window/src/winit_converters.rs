@@ -1,19 +1,55 @@
-use core::panic;
-
-use ly_events::types::{InputEvent, WindowEvent};
+use ly_events::types::{ButtonEvent, MouseEvent};
 use ly_input::{Key, MouseButton as LyMouseBtn};
-use winit::event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode};
+use winit::dpi::PhysicalPosition;
+use winit::event::{ElementState, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
-fn convert_key_state(key: Key, state: ElementState) -> InputEvent
+fn convert_mousebtn_state(key: LyMouseBtn, state: ElementState) -> ButtonEvent
 {
 	use ElementState::*;
 	match state {
-		Pressed => InputEvent::KeyPressed(key),
-		Released => InputEvent::KeyReleased(key),
+		Pressed => ButtonEvent::MousePressed(key),
+		Released => ButtonEvent::MouseReleased(key),
 	}
 }
 
-pub(crate) fn convert_keyboard_input(e: KeyboardInput) -> InputEvent
+pub(crate) fn convert_mouse_button(b: MouseButton, s: ElementState) -> ButtonEvent
+{
+	match b {
+		MouseButton::Left => convert_mousebtn_state(LyMouseBtn::Left, s),
+		MouseButton::Right => convert_mousebtn_state(LyMouseBtn::Right, s),
+		MouseButton::Middle => convert_mousebtn_state(LyMouseBtn::Middle, s),
+		MouseButton::Other(o) => convert_mousebtn_state(LyMouseBtn::Other(o), s),
+	}
+}
+
+pub(crate) fn convert_mouse_move((dx, dy): (f64, f64)) -> MouseEvent
+{
+	MouseEvent::MouseMove(dx, dy)
+}
+
+pub(crate) fn convert_cursor_move(p: PhysicalPosition<f64>) -> MouseEvent
+{
+	MouseEvent::CursorMove(p.x, p.y)
+}
+
+pub(crate) fn convert_mouse_scroll(delta: winit::event::MouseScrollDelta) -> ButtonEvent
+{
+	match delta {
+		MouseScrollDelta::LineDelta(dx, dy) => ButtonEvent::MouseScroll(dx as f64, dy as f64),
+		MouseScrollDelta::PixelDelta(p) => ButtonEvent::MouseScroll(p.x, p.y),
+	}
+}
+
+fn convert_key_state(key: Key, state: ElementState) -> ButtonEvent
+{
+	use ElementState::*;
+	match state {
+		Pressed => ButtonEvent::KeyPressed(key),
+		Released => ButtonEvent::KeyReleased(key),
+	}
+}
+
+pub(crate) fn convert_keyboard_input(e: KeyboardInput) -> ButtonEvent
 {
 	let state = e.state;
 	if let Some(key) = e.virtual_keycode {
@@ -194,28 +230,4 @@ pub(crate) fn convert_keyboard_input(e: KeyboardInput) -> InputEvent
 
 		convert_key_state(Key::Other(e.scancode), state)
 	}
-}
-
-fn convert_mousebtn_state(key: LyMouseBtn, state: ElementState) -> InputEvent
-{
-	use ElementState::*;
-	match state {
-		Pressed => InputEvent::MousePressed(key),
-		Released => InputEvent::MouseReleased(key),
-	}
-}
-
-pub(crate) fn convert_mouse_button(b: MouseButton, s: ElementState) -> InputEvent
-{
-	match b {
-		MouseButton::Left => convert_mousebtn_state(LyMouseBtn::Left, s),
-		MouseButton::Right => convert_mousebtn_state(LyMouseBtn::Right, s),
-		MouseButton::Middle => convert_mousebtn_state(LyMouseBtn::Middle, s),
-		MouseButton::Other(o) => convert_mousebtn_state(LyMouseBtn::Other(o), s),
-	}
-}
-
-pub(crate) fn convert_mouse_move(p: winit::dpi::PhysicalPosition<f64>) -> InputEvent
-{
-	InputEvent::MouseMove(p.x, p.y)
 }

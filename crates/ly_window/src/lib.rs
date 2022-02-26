@@ -4,7 +4,7 @@ mod winit_converters;
 use winit_converters as converters;
 
 use ly_events::channel::SyncEventWriter;
-use ly_events::types::{InputEvent, WindowEvent};
+use ly_events::types::{ButtonEvent, MouseEvent, WindowEvent};
 use ly_log::core_prelude::*;
 use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
@@ -68,7 +68,8 @@ pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 
 pub fn get_sync_forwarding_event_loop<'a>(
 	writer_window: SyncEventWriter<'a, WindowEvent>,
-	writer_input: SyncEventWriter<'a, InputEvent>,
+	writer_button: SyncEventWriter<'a, ButtonEvent>,
+	writer_mouse: SyncEventWriter<'a, MouseEvent>,
 ) -> Box<dyn EventHandler + 'a>
 {
 	Box::new(
@@ -85,13 +86,16 @@ pub fn get_sync_forwarding_event_loop<'a>(
 					*control_flow = ControlFlow::Exit;
 				}
 				event::WindowEvent::MouseInput { button, state, .. } => {
-					writer_input.send(converters::convert_mouse_button(button, state));
+					writer_button.send(converters::convert_mouse_button(button, state));
 				}
 				event::WindowEvent::CursorMoved { position, .. } => {
-					writer_input.send(converters::convert_mouse_move(position));
+					writer_mouse.send(converters::convert_cursor_move(position));
 				}
 				event::WindowEvent::KeyboardInput { input, .. } => {
-					writer_input.send(converters::convert_keyboard_input(input));
+					writer_button.send(converters::convert_keyboard_input(input));
+				}
+				event::WindowEvent::MouseWheel { delta, .. } => {
+					writer_button.send(converters::convert_mouse_scroll(delta));
 				}
 				_ => (),
 			},
@@ -99,6 +103,9 @@ pub fn get_sync_forwarding_event_loop<'a>(
 				event,
 				device_id: _winit_device_id,
 			} => match event {
+				event::DeviceEvent::MouseMotion { delta } => {
+					writer_mouse.send(converters::convert_mouse_move(delta));
+				}
 				_ => (),
 			},
 			event::Event::MainEventsCleared => {}
