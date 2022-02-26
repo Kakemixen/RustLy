@@ -109,6 +109,12 @@ pub mod channel
 	pub use super::sync_event_channel::*;
 }
 
+/// Provides event types to be used with the LY engine
+///
+/// TODO: Consider having a channel per event, and not
+/// grouped together like this. With some abstraction
+/// to have a "group reader" this might be more effective,
+/// as there are less/no irrelevant events for a reader.
 pub mod types
 {
 	pub use super::event_types::*;

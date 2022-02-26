@@ -261,7 +261,7 @@ impl<'a, T> SyncEventReader<'a, T>
 	/// as there are new events that can be flushed.
 	///
 	/// If no events are present, the thread will halt and wake when the
-	/// next [`SyncEventChannel::send`] occurs.
+	/// next [`SyncEventWriter::send`] occurs.
 	pub fn wait_new(&self)
 	{
 		let _lock = self.channel.write_mutex.lock();

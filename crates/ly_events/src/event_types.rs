@@ -21,7 +21,7 @@ pub enum MouseEvent
 	///
 	/// Well suited for cursor-like behaviour
 	/// Should not be used to implement non-cursor functionality,
-	/// use [MouseMove] instead
+	/// use [MouseEvent::MouseMove] instead
 	CursorMove(f64, f64),
 
 	/// Event reporting the delta the device has moved
