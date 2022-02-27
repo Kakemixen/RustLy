@@ -5,6 +5,8 @@ use std::sync::Arc;
 use std::thread;
 //use std::time::Duration;
 
+use rustly::events::channel::{wait_any_new, EventWaiter};
+
 fn main()
 {
 	log_init();
@@ -23,13 +25,17 @@ fn main()
 			//let reader_w = cw.get_reader();
 			let reader_b = cb.get_reader();
 			let reader_m = cm.get_reader();
+			let arr: [&dyn EventWaiter; 2] = [&reader_b, &reader_m];
 
 			loop {
 				// need this for some reason, or it will drop events
 				// TODO why?
 				// thread::sleep(Duration::from_millis(1));
 				// wait_new solves it here, but not root cause
-				reader_b.wait_new();
+				//reader_b.wait_new();
+
+				wait_any_new(&arr);
+				//wait_any_new(&[&reader_b as &dyn EventWaiter]);
 
 				reader_b.flush_channel();
 				for event in reader_b.read() {

@@ -14,32 +14,6 @@ use crate::event_signal;
 /// stack unless wrapped in `Arc` or something similar. This is important
 /// information regarding having the reader and emitting channel in different
 /// threads, keep in mind the reader has a borrow to the channel.
-///
-/// The [`SyncEventReader`] has some synchronization methods to wait for new
-/// events, [`SyncEventReader::wait_new`], and to wait for someone else to flush
-/// the channel [`SyncEventReader::wait_flushed`].
-///
-/// For unscoped threads this is one way to work, note the `Arc` and
-/// `wait_new()`
-/// ```
-/// # struct TestEvent { data: usize, }
-/// # use std::thread;
-/// # use std::sync::Arc;
-/// # use ly_events::channel::SyncEventChannel;
-/// let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
-///
-/// let c = Arc::clone(&channel);
-/// let rec1 = thread::spawn(move || {
-/// 	let reader = c.get_reader();
-/// 	loop {
-/// 		reader.wait_new();
-/// 		reader.flush_channel();
-/// 		for event in reader.read() {
-/// 			// do stuff
-/// 		}
-/// 	}
-/// });
-/// ```
 pub struct SyncEventChannel<T>
 {
 	channel: EventChannel<T>,
@@ -72,6 +46,55 @@ pub struct SyncEventReader<'a, T>
 }
 
 unsafe impl<T> Sync for SyncEventChannel<T> {}
+
+/// Trait for parking the thread and wait for some future event
+///
+/// Trait is intended for use as trait objects in tandemn with [wait_any_new],
+/// but can of course be used for what you like.
+pub trait EventWaiter
+{
+	/// Add the parker to be notified on some future event
+	///
+	/// Returns an error if not all current events are handled
+	fn add_unparker_new(&self, p: &Parker) -> Result<(), String>;
+}
+
+impl<'a, T> EventWaiter for SyncEventReader<'a, T>
+{
+	/// Add the parker to be notified on the next [SyncEventWriter::send].
+	///
+	/// It is advised to use [wait_any_new] instead, which wraps this function.
+	fn add_unparker_new(&self, p: &Parker) -> Result<(), String>
+	{
+		let _lock = self.channel.write_mutex.lock();
+		if self.channel.has_new_events() {
+			return Err("already new unflushed events".to_string());
+		}
+
+		unsafe {
+			event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), p);
+			Ok(())
+		}
+	}
+}
+
+/// Wait for any events to be sent to the channels of the passed
+/// [`EventWaiter`]s
+///
+/// The trait object is used to enable iteration over multiple channel types,
+/// perhaps there's a better way, but I don't know about it.
+///
+/// If any channels has unread events, it will return directly, without waiting
+pub fn wait_any_new(readers: &[&dyn EventWaiter])
+{
+	let p = Parker::new();
+	for reader in readers {
+		if let Err(_) = reader.add_unparker_new(&p) {
+			return;
+		}
+	}
+	p.park();
+}
 
 impl<T> SyncEventChannel<T>
 {

@@ -55,6 +55,11 @@ pub mod signal
 
 /// Module for sending events through channels
 ///
+/// TODO
+/// * Create a writer for `EventChannel`, make interface the same.
+/// * Remove the basic `EventChannel`, the whole point is to send stuff
+/// between threads
+///
 /// Event channels are instantiated for some event-type, and are read
 /// by readers that are created by those instantiated channels.
 /// In order to read events, they first need to be flushed.
@@ -66,9 +71,6 @@ pub mod signal
 ///
 /// A single channel may have multiple readers. Reading an event
 /// does not consume it for other readers.
-///
-/// There is a sync alternative [`channel::SyncEventChannel`],
-/// which is probably the most useful one.
 ///
 /// ### Example single-threaded event flow
 ///
@@ -103,6 +105,79 @@ pub mod signal
 /// assert_eq!(events, Vec::<&TestEvent>::new(),
 /// 	"cannot read twice");
 /// ```
+///
+/// ## Sync options
+///
+/// The [`SyncEventChannel`](channel::SyncEventChannel) is the `Sync`
+/// alternative, enabling e.g. multithreading. The reading interface is the same
+/// as for the single-threaded event channel. In fact, the sync channel is just
+/// a wrapper adding additional sync logic. For writing, it is enforced to use
+/// a [`SyncEventWriter`](channel::SyncEventWriter), of which there can be
+/// multiple. The channel keeps track of the number of writers, so it may be
+/// queried whether there are any writers with the reader method
+/// [`channel_has_writers`](channel::SyncEventReader::channel_has_writers).
+///
+/// With the current implementation, the reader has a borrow of the channel.
+/// This makes it necessary for the reading thread to also have a clone of
+/// the `Arc` (or equivalent) holding the channel, because of lifetimes. In
+/// order to enforce this, the sync reader is not `Send` nor `Sync`.
+///
+/// For unscoped threads this is one way to work:
+/// ```
+/// # struct TestEvent { data: usize, }
+/// # use std::thread;
+/// # use std::sync::Arc;
+/// # use ly_events::channel::SyncEventChannel;
+/// let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
+///
+/// let c = Arc::clone(&channel);
+/// thread::spawn(move || {
+/// 	let reader = c.get_reader();
+/// 	reader.flush_channel();
+/// 	for event in reader.read() {
+/// 		// do stuff
+/// 	}
+/// });
+/// ```
+///
+/// ### Waiting for events
+///
+/// The [`SyncEventReader`](channel::SyncEventReader) has some synchronization
+/// methods to wait for the channel to reach a certain state.
+/// * [`wait_new`](channel::SyncEventReader::wait_new), to wait for new events
+///   to be sent to the channel.
+/// * [`wait_flushed`](channel::SyncEventReader::wait_flushed), to wait for
+///   someone else to flush the channel.
+///
+/// In order to wait for multiple readers, the readers implement the
+/// [`EventWaiter`](channel::EventWaiter) trait so that
+/// [`wait_any_new`](channel::wait_any_new) can be used. The following example
+/// will read event if the channel of either `reader1` or `reader2` has
+/// unflushed events.
+/// ```
+/// # struct TestEvent { data: usize, }
+/// # use std::thread;
+/// # use std::sync::Arc;
+/// # use ly_events::channel::{SyncEventChannel, EventWaiter, wait_any_new};
+/// let channel1 = Arc::new(SyncEventChannel::<TestEvent>::new());
+/// let channel2 = Arc::new(SyncEventChannel::<TestEvent>::new());
+///
+/// let c = Arc::clone(&channel1);
+/// thread::spawn(move || {
+///     c.get_writer().send(TestEvent { data: 42 });
+/// });
+///
+/// let reader1 = channel1.get_reader();
+/// let reader2 = channel2.get_reader();
+/// let readers: [&dyn EventWaiter; 2] = [&reader1, &reader2];
+///
+/// wait_any_new(&readers);
+///
+/// // read events from reader1 and reader2
+/// ```
+///
+/// Note that [`wait_any_new`](channel::wait_any_new) uses dynamic dispatch,
+/// so it will be more performant to wait on a specific event reader.
 pub mod channel
 {
 	pub use super::event_channel::*;
