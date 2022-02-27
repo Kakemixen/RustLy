@@ -25,7 +25,8 @@ impl SignalEvent
 	/// Wait for signal
 	pub fn wait(&self)
 	{
-		let p = add_waiter(&mut self.waiters.lock());
+		let p = Parker::new();
+		add_waiter(&mut self.waiters.lock(), &p);
 		p.park();
 	}
 }
@@ -38,9 +39,8 @@ pub(crate) fn signal_waiters(waiters: &mut Vec<Unparker>)
 	waiters.clear();
 }
 
-pub(crate) fn add_waiter(waiters: &mut Vec<Unparker>) -> Parker
+pub(crate) fn add_waiter<'a>(waiters: &mut Vec<Unparker>, p: &'a Parker) -> &'a Parker
 {
-	let p = Parker::new();
 	let u = p.unparker().clone();
 	waiters.push(u);
 	p

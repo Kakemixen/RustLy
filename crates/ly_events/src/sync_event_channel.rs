@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use crossbeam::sync::Unparker;
+use crossbeam::sync::{Parker, Unparker};
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
@@ -270,7 +270,8 @@ impl<'a, T> SyncEventReader<'a, T>
 		}
 
 		unsafe {
-			let p = event_signal::add_waiter(&mut *self.channel.new_event_waiters.get());
+			let p = Parker::new();
+			event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), &p);
 			drop(_lock);
 			p.park();
 		}
@@ -294,7 +295,8 @@ impl<'a, T> SyncEventReader<'a, T>
 		}
 
 		unsafe {
-			let p = event_signal::add_waiter(&mut *self.channel.flushed_waiters.get());
+			let p = Parker::new();
+			event_signal::add_waiter(&mut *self.channel.flushed_waiters.get(), &p);
 			drop(_lock);
 			p.park();
 		}
