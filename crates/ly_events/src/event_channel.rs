@@ -15,6 +15,16 @@ pub struct EventChannel<T>
 	pub(crate) start_idx_a: UnsafeCell<usize>,
 	pub(crate) start_idx_b: UnsafeCell<usize>,
 	pub(crate) readable_buffer: UnsafeCell<ReadableEventBuffer>,
+	writers: UnsafeCell<usize>,
+}
+
+/// Single-threaded event writer
+///
+/// Created by [`EventChannel::get_writer`].
+/// Borrows the channel immutably upon creation.
+pub struct EventWriter<'a, T>
+{
+	channel: &'a EventChannel<T>,
 }
 
 /// Single-threaded event reader
@@ -38,11 +48,12 @@ impl<T> EventChannel<T>
 			start_idx_a: UnsafeCell::new(0),
 			start_idx_b: UnsafeCell::new(0),
 			readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
+			writers: UnsafeCell::new(0),
 		}
 	}
 
 	/// Sends the event on the channel
-	pub fn send(&self, e: T)
+	pub(crate) fn send(&self, e: T)
 	{
 		unsafe {
 			match *self.readable_buffer.get() {
@@ -88,12 +99,47 @@ impl<T> EventChannel<T>
 		}
 	}
 
+	/// Creates a writer for this channel
+	pub fn get_writer(&self) -> EventWriter<T>
+	{
+		unsafe {
+			let writers = self.writers.get();
+			*writers += 1;
+		}
+		EventWriter { channel: self }
+	}
+
 	/// Creates a reader for this channel
 	pub fn get_reader(&self) -> EventReader<T>
 	{
 		EventReader {
 			read_events: UnsafeCell::new(0),
 			channel: self,
+		}
+	}
+
+	fn has_writers(&self) -> bool
+	{
+		unsafe {
+			let writers = self.writers.get();
+			*writers != 0
+		}
+	}
+}
+
+impl<'a, T> EventWriter<'a, T>
+{
+	/// Sends the event to the channel
+	pub fn send(&self, event: T) { self.channel.send(event); }
+}
+
+impl<'a, T> Drop for EventWriter<'a, T>
+{
+	fn drop(&mut self)
+	{
+		unsafe {
+			let writers = self.channel.writers.get();
+			*writers += 1;
 		}
 	}
 }
@@ -141,4 +187,7 @@ impl<'a, T> EventReader<'a, T>
 	/// It is adviced to use this for flushing. Read [`EventChannel::flush`]
 	/// for a descripion of the behaviour regarding flushing.
 	pub fn flush_channel(&self) { self.channel.flush(); }
+
+	/// Checks if there are any writers connected to reading channel
+	pub fn channel_has_writers(&self) -> bool { self.channel.has_writers() }
 }

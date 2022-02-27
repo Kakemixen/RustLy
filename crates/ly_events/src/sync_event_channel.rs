@@ -325,6 +325,7 @@ impl<'a, T> SyncEventReader<'a, T>
 		}
 	}
 
+	/// Checks if there are any writers connected to reading channel
 	pub fn channel_has_writers(&self) -> bool { self.channel.has_writers() }
 }
 

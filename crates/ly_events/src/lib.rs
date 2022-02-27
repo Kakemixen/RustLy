@@ -56,18 +56,19 @@ pub mod signal
 /// Module for sending events through channels
 ///
 /// TODO
-/// * Create a writer for `EventChannel`, make interface the same.
 /// * Remove the basic `EventChannel`, the whole point is to send stuff
 /// between threads
 ///
-/// Event channels are instantiated for some event-type, and are read
-/// by readers that are created by those instantiated channels.
-/// In order to read events, they first need to be flushed.
+/// Event channels are instantiated for some event-type. They are read
+/// by readers and written by writers that are created by those instantiated
+/// channels. In order to read events, they first need to be flushed.
 /// Once read, events are not read again.
 ///
-/// A reader has a borrow of the channel it reads, the one that created the
-/// reader. This is to ensure that the reader always has a channel to read from,
-/// and to enable a more ergonomic API.
+/// There are no type constraints regarding the event type.
+///
+/// A writer/reader has a borrow of the channel it reads, the one that created
+/// the reader. This is to ensure that the reader always has a channel to read
+/// from, and to enable a more ergonomic API.
 ///
 /// A single channel may have multiple readers. Reading an event
 /// does not consume it for other readers.
@@ -83,13 +84,14 @@ pub mod signal
 /// let event = TestEvent { data: 42 };
 /// let event_clone = event.clone();
 ///
+/// let writer = test_channel.get_writer();
 /// let reader = test_channel.get_reader();
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, Vec::<&TestEvent>::new(),
 /// 	"initial events empty");
 ///
-/// test_channel.send(event);
+/// writer.send(event);
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, Vec::<&TestEvent>::new(),
@@ -109,13 +111,9 @@ pub mod signal
 /// ## Sync options
 ///
 /// The [`SyncEventChannel`](channel::SyncEventChannel) is the `Sync`
-/// alternative, enabling e.g. multithreading. The reading interface is the same
+/// alternative, enabling e.g. multithreading. The interface is the same
 /// as for the single-threaded event channel. In fact, the sync channel is just
-/// a wrapper adding additional sync logic. For writing, it is enforced to use
-/// a [`SyncEventWriter`](channel::SyncEventWriter), of which there can be
-/// multiple. The channel keeps track of the number of writers, so it may be
-/// queried whether there are any writers with the reader method
-/// [`channel_has_writers`](channel::SyncEventReader::channel_has_writers).
+/// a wrapper adding additional sync logic.
 ///
 /// With the current implementation, the reader has a borrow of the channel.
 /// This makes it necessary for the reading thread to also have a clone of
@@ -212,17 +210,18 @@ mod tests
 	}
 
 	#[test]
-	fn flow()
+	fn channel_flow()
 	{
 		let test_channel = EventChannel::<TestEvent>::new();
 		let event0 = TestEvent { data: 0 };
 		let event1 = TestEvent { data: 1 };
 
+		let writer = test_channel.get_writer();
 		let reader = test_channel.get_reader();
 		let events = reader.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(events, Vec::<&TestEvent>::new(), "initial events empty");
 
-		test_channel.send(event0);
+		writer.send(event0);
 		test_channel.flush();
 
 		let events = reader.read().collect::<Vec<&TestEvent>>();
@@ -232,7 +231,7 @@ mod tests
 			"reader can read flushed event0"
 		);
 
-		test_channel.send(event1);
+		writer.send(event1);
 		test_channel.flush();
 
 		let events = reader.read().collect::<Vec<&TestEvent>>();
