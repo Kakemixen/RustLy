@@ -31,6 +31,13 @@ pub mod log
 
 use ly_log::core_prelude::*;
 
+/// Application for the engine, the glue that holds everything together.
+/// Don't create more that one, it uses references to static variables.
+pub mod app
+{
+	pub use ly_app::*;
+}
+
 /// Event system for LY engine clients
 ///
 /// The crate provides functionality to send event via "channels"
