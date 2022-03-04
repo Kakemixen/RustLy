@@ -11,7 +11,7 @@ pub type AppRunner = dyn FnOnce(App) -> ();
 #[derive(Default)]
 pub struct App
 {
-	world: World,
+	pub world: World,
 	runner: Option<Box<AppRunner>>,
 }
 
@@ -21,24 +21,6 @@ impl App
 	{
 		log_init();
 		App::default()
-	}
-
-	/// Insert a resource into the global storage.
-	/// See [`World::set_resource`]
-	pub fn set_resource<T>(&self, resource: T) -> Result<(), ()>
-	where
-		T: Send + Sync + 'static,
-	{
-		self.world.set_resource(resource)
-	}
-
-	/// Get a resource from the global storage.
-	/// See [`World::get_resource`]
-	pub fn get_resource<T>(&self) -> Result<&'static T, ()>
-	where
-		T: Send + Sync + 'static,
-	{
-		self.world.get_resource()
 	}
 
 	/// Runs the application.

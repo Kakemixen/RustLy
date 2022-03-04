@@ -7,7 +7,6 @@ use ly_app::{App, AppRunner};
 use ly_events::channel::{SyncEventChannel, SyncEventWriter};
 use ly_events::types::{ButtonEvent, MouseEvent, WindowEvent};
 use ly_log::core_prelude::*;
-use std::error::Error;
 use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::platform::run_return::EventLoopExtRunReturn;
@@ -51,18 +50,21 @@ impl LyWindow
 		end_handler();
 	}
 
-	pub fn get_app_runner(self) -> Result<Box<AppRunner>, Box<dyn Error>>
+	pub fn get_app_runner(self) -> Box<AppRunner>
 	{
 		let closure = move |app: App| {
 			let writer_window = app
+				.world
 				.get_resource::<SyncEventChannel<WindowEvent>>()
 				.unwrap()
 				.get_writer();
 			let writer_button = app
+				.world
 				.get_resource::<SyncEventChannel<ButtonEvent>>()
 				.unwrap()
 				.get_writer();
 			let writer_mouse = app
+				.world
 				.get_resource::<SyncEventChannel<MouseEvent>>()
 				.unwrap()
 				.get_writer();
@@ -71,7 +73,7 @@ impl LyWindow
 				get_sync_forwarding_event_loop(writer_window, writer_button, writer_mouse);
 			self.run(event_handler, Box::new(|| ()))
 		};
-		Ok(Box::new(closure))
+		Box::new(closure)
 	}
 }
 

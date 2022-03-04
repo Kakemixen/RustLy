@@ -31,7 +31,6 @@ pub struct SyncEventChannel<T>
 pub struct SyncEventWriter<'a, T>
 {
 	channel: &'a SyncEventChannel<T>,
-	_not_send_sync: PhantomData<*const ()>, // to explicitly say it cannot be sent
 }
 
 /// Thread-safe event reader
@@ -42,7 +41,6 @@ pub struct SyncEventReader<'a, T>
 {
 	read_events: UnsafeCell<usize>,
 	channel: &'a SyncEventChannel<T>,
-	_not_send_sync: PhantomData<*const ()>, // to explicitly say it cannot be sent
 }
 
 unsafe impl<T> Sync for SyncEventChannel<T> {}
@@ -152,10 +150,7 @@ impl<T> SyncEventChannel<T>
 			let writers = self.writers.get();
 			(*writers).fetch_add(1, Ordering::Relaxed);
 		}
-		SyncEventWriter {
-			channel: self,
-			_not_send_sync: PhantomData,
-		}
+		SyncEventWriter { channel: self }
 	}
 
 	/// Creates a reader for this channel
@@ -164,7 +159,6 @@ impl<T> SyncEventChannel<T>
 		SyncEventReader {
 			read_events: UnsafeCell::new(1), // avoid stupid stuff when read=0
 			channel: self,
-			_not_send_sync: PhantomData,
 		}
 	}
 
