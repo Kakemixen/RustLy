@@ -1,5 +1,4 @@
 use rustly::events::types::{ButtonEvent, MouseEvent, WindowEvent};
-use rustly::log::*;
 use rustly::{events, window};
 use std::sync::Arc;
 use std::thread;
@@ -9,7 +8,6 @@ use rustly::events::channel::{wait_any_new, EventWaiter};
 
 fn main()
 {
-	log_init();
 	let window = window::create_window();
 
 	let channel_button = Arc::new(events::channel::SyncEventChannel::<ButtonEvent>::new());
@@ -41,7 +39,7 @@ fn main()
 				for event in reader_b.read() {
 					match event {
 						e => {
-							info!("recieved {:?}", e);
+							println!("recieved {:?}", e);
 						}
 					}
 				}
@@ -50,7 +48,7 @@ fn main()
 				for event in reader_m.read() {
 					match event {
 						e => {
-							info!("recieved {:?}", e);
+							println!("recieved {:?}", e);
 						}
 					}
 				}

@@ -43,13 +43,15 @@ use thread_local::ThreadLocal;
 /// exports intended for clients outside the LY engine
 pub mod prelude
 {
-	pub use super::{debug, error, info, log_init, trace, warning};
+	pub use super::{debug, error, info, trace, warning};
 }
 
 /// exports intended for the LY engine
 pub mod core_prelude
 {
-	pub use super::{core_debug, core_error, core_info, core_trace, core_warning, log_die};
+	pub use super::{
+		core_debug, core_error, core_info, core_trace, core_warning, log_die, log_init,
+	};
 }
 
 pub enum LogLevel

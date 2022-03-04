@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 winit = "0.26.1"
 
+ly_app = { path = "../ly_app" }
 ly_events = { path = "../ly_events" }
-ly_log = { path = "../ly_log" }
 ly_input = { path = "../ly_input" }
+ly_log = { path = "../ly_log" }

@@ -469,6 +469,7 @@ dependencies = [
 name = "ly_app"
 version = "0.1.0"
 dependencies = [
+ "ly_log",
  "state",
 ]
 
@@ -499,6 +500,7 @@ dependencies = [
 name = "ly_window"
 version = "0.1.0"
 dependencies = [
+ "ly_app",
  "ly_events",
  "ly_input",
  "ly_log",

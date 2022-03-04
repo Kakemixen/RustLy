@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 state = "0.5.2"
+ly_log = { path = "../ly_log" }

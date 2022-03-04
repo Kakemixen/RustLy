@@ -3,9 +3,11 @@
 mod winit_converters;
 use winit_converters as converters;
 
-use ly_events::channel::SyncEventWriter;
+use ly_app::{App, AppRunner};
+use ly_events::channel::{SyncEventChannel, SyncEventWriter};
 use ly_events::types::{ButtonEvent, MouseEvent, WindowEvent};
 use ly_log::core_prelude::*;
+use std::error::Error;
 use winit::event;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::platform::run_return::EventLoopExtRunReturn;
@@ -48,6 +50,29 @@ impl LyWindow
 		self.event_loop.run_return(event_handler);
 		end_handler();
 	}
+
+	pub fn get_app_runner(self) -> Result<Box<AppRunner>, Box<dyn Error>>
+	{
+		let closure = move |app: App| {
+			let writer_window = app
+				.get_resource::<SyncEventChannel<WindowEvent>>()
+				.unwrap()
+				.get_writer();
+			let writer_button = app
+				.get_resource::<SyncEventChannel<ButtonEvent>>()
+				.unwrap()
+				.get_writer();
+			let writer_mouse = app
+				.get_resource::<SyncEventChannel<MouseEvent>>()
+				.unwrap()
+				.get_writer();
+
+			let event_handler =
+				get_sync_forwarding_event_loop(writer_window, writer_button, writer_mouse);
+			self.run(event_handler, Box::new(|| ()))
+		};
+		Ok(Box::new(closure))
+	}
 }
 
 pub fn get_empty_event_loop() -> Box<dyn EventHandler>
@@ -80,9 +105,8 @@ pub fn get_sync_forwarding_event_loop<'a>(
 				..
 			} => match event {
 				event::WindowEvent::CloseRequested => {
-					core_info!("closing");
+					core_info!("closing window");
 					writer_window.send(WindowEvent::WindowClose);
-					log_die("The close button was pressed; stopping".to_string());
 					*control_flow = ControlFlow::Exit;
 				}
 				event::WindowEvent::MouseInput { button, state, .. } => {
@@ -112,15 +136,4 @@ pub fn get_sync_forwarding_event_loop<'a>(
 			_ => (),
 		},
 	)
-}
-
-#[cfg(test)]
-mod tests
-{
-	#[test]
-	fn it_works()
-	{
-		let result = 2 + 2;
-		assert_eq!(result, 4);
-	}
 }
