@@ -11,7 +11,7 @@
 ///
 /// It contains macros to log format strings via a logging thread
 ///
-/// The logger must be initiaized with the [log::log_init] function
+/// The logger will be initialized and cleaned by the [`App`](app::App)
 ///
 /// There are five logging levels/macros, listed in increasing severity:
 /// `trace!`, `debug!`, `info!`, `warning!`, `error!`.

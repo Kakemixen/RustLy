@@ -28,7 +28,7 @@ impl App
 	}
 
 	/// Runs the application.
-	/// This will use the runner set by (`set_runner`)[App::set_runner]
+	/// This will use the runner set by [`set_runner`](App::set_runner)
 	/// and hijack the running the thread.
 	pub fn run(mut self) -> !
 	{
