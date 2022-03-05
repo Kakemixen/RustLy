@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ly_app::World;
 use ly_events::channel::wait_any_new;
@@ -30,8 +30,16 @@ fn main()
 
 	let runner = window.get_app_runner();
 	app.add_process(thing_i_want_to_do);
+	app.add_system(basic_system);
 	app.set_runner(runner);
 	app.run();
+}
+
+fn basic_system(world: &World)
+{
+	if let Ok(count) = world.get_resource::<AtomicUsize>() {
+		count.fetch_add(1, Ordering::Relaxed);
+	}
 }
 
 fn thing_i_want_to_do(world: &World)

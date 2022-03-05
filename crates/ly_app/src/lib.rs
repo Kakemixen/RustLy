@@ -20,6 +20,7 @@ pub struct App
 	pub world: World,
 	runner: Option<Box<AppRunner>>,
 	processes: Option<Vec<AppSubProcess>>,
+	systems: Vec<AppSubProcess>,
 }
 
 impl App
@@ -59,8 +60,8 @@ impl App
 	/// Update tick for application
 	pub fn update(&mut self)
 	{
-		if let Ok(count) = &mut self.world.get_resource::<AtomicUsize>() {
-			count.fetch_add(1, Ordering::Relaxed);
+		for system in self.systems.iter() {
+			system(&self.world);
 		}
 	}
 
@@ -80,6 +81,10 @@ impl App
 			self.processes = Some(vec![func]);
 		}
 	}
+
+	/// Adds a system to the application.
+	/// The provided fn will we run every app update in the main thread.
+	pub fn add_system(&mut self, func: AppSubProcess) { self.systems.push(func); }
 
 	/// Gets a world handle to be passed to subprocess
 	/// TODO: create system to pass resources to subprocess instead of the world
