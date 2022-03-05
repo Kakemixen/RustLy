@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use crossbeam::sync::{Parker, Unparker};
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
@@ -22,6 +21,21 @@ pub struct SyncEventChannel<T>
 	new_event_waiters: UnsafeCell<Vec<Unparker>>,
 	flushed_waiters: UnsafeCell<Vec<Unparker>>,
 	writers: UnsafeCell<AtomicUsize>,
+}
+
+impl<T> Default for SyncEventChannel<T>
+{
+	fn default() -> Self
+	{
+		SyncEventChannel {
+			channel: EventChannel::default(),
+			write_mutex: Mutex::new(()),
+			flush_mutex: RwLock::new(()),
+			new_event_waiters: UnsafeCell::new(Vec::new()),
+			flushed_waiters: UnsafeCell::new(Vec::new()),
+			writers: UnsafeCell::new(AtomicUsize::new(0)),
+		}
+	}
 }
 
 /// Thread-safe event writer
@@ -96,19 +110,6 @@ pub fn wait_any_new(readers: &[&dyn EventWaiter])
 
 impl<T> SyncEventChannel<T>
 {
-	/// Creates a new thread-safe event channel
-	pub fn new() -> SyncEventChannel<T>
-	{
-		SyncEventChannel {
-			channel: EventChannel::new(),
-			write_mutex: Mutex::new(()),
-			flush_mutex: RwLock::new(()),
-			new_event_waiters: UnsafeCell::new(Vec::new()),
-			flushed_waiters: UnsafeCell::new(Vec::new()),
-			writers: UnsafeCell::new(AtomicUsize::new(0)),
-		}
-	}
-
 	/// Sends the event to the channel
 	///
 	/// This also wakes any threads waiting for new events via

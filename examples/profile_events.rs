@@ -2,6 +2,7 @@ use rustly::events;
 use std::sync::Arc;
 use std::time::Instant;
 
+#[derive(Default)]
 struct MyEvent
 {
 	num: usize,
@@ -13,7 +14,7 @@ const NUM_EVENTS: usize = 10000000;
 
 fn run() -> usize
 {
-	let channel = Arc::new(events::channel::SyncEventChannel::<MyEvent>::new());
+	let channel = Arc::new(events::channel::SyncEventChannel::<MyEvent>::default());
 	let reader = channel.get_reader();
 	let writer = channel.get_writer();
 	let mut total: usize = 0;

@@ -80,7 +80,7 @@ pub mod signal
 /// #[derive(Debug, PartialEq, Eq, Clone)]
 /// struct TestEvent { data: usize, }
 ///
-/// let test_channel = EventChannel::<TestEvent>::new();
+/// let test_channel = EventChannel::<TestEvent>::default();
 /// let event = TestEvent { data: 42 };
 /// let event_clone = event.clone();
 ///
@@ -88,13 +88,13 @@ pub mod signal
 /// let reader = test_channel.get_reader();
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
-/// assert_eq!(events, Vec::<&TestEvent>::new(),
+/// assert_eq!(events, Vec::<&TestEvent>::default(),
 /// 	"initial events empty");
 ///
 /// writer.send(event);
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
-/// assert_eq!(events, Vec::<&TestEvent>::new(),
+/// assert_eq!(events, Vec::<&TestEvent>::default(),
 /// 	"still emply after send");
 ///
 /// test_channel.flush();
@@ -104,7 +104,7 @@ pub mod signal
 /// 	"reader can read flushed event");
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
-/// assert_eq!(events, Vec::<&TestEvent>::new(),
+/// assert_eq!(events, Vec::<&TestEvent>::default(),
 /// 	"cannot read twice");
 /// ```
 ///
@@ -126,7 +126,7 @@ pub mod signal
 /// # use std::thread;
 /// # use std::sync::Arc;
 /// # use ly_events::channel::SyncEventChannel;
-/// let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
+/// let channel = Arc::new(SyncEventChannel::<TestEvent>::default());
 ///
 /// let c = Arc::clone(&channel);
 /// thread::spawn(move || {
@@ -142,8 +142,8 @@ pub mod signal
 ///
 /// The [`SyncEventReader`](channel::SyncEventReader) has some synchronization
 /// methods to wait for the channel to reach a certain state.
-/// * [`wait_new`](channel::SyncEventReader::wait_new), to wait for new events
-///   to be sent to the channel.
+/// * [`wait_new`](channel::SyncEventReader::wait_new), to wait for default
+///   events to be sent to the channel.
 /// * [`wait_flushed`](channel::SyncEventReader::wait_flushed), to wait for
 ///   someone else to flush the channel.
 ///
@@ -157,8 +157,8 @@ pub mod signal
 /// # use std::thread;
 /// # use std::sync::Arc;
 /// # use ly_events::channel::{SyncEventChannel, EventWaiter, wait_any_new};
-/// let channel1 = Arc::new(SyncEventChannel::<TestEvent>::new());
-/// let channel2 = Arc::new(SyncEventChannel::<TestEvent>::new());
+/// let channel1 = Arc::new(SyncEventChannel::<TestEvent>::default());
+/// let channel2 = Arc::new(SyncEventChannel::<TestEvent>::default());
 ///
 /// let c = Arc::clone(&channel1);
 /// thread::spawn(move || {
@@ -203,7 +203,7 @@ mod tests
 	use std::thread;
 	use std::time::Duration;
 
-	#[derive(Debug, PartialEq, Eq)]
+	#[derive(Debug, Default, PartialEq, Eq)]
 	struct TestEvent
 	{
 		data: usize,
@@ -212,14 +212,14 @@ mod tests
 	#[test]
 	fn channel_flow()
 	{
-		let test_channel = EventChannel::<TestEvent>::new();
+		let test_channel = EventChannel::<TestEvent>::default();
 		let event0 = TestEvent { data: 0 };
 		let event1 = TestEvent { data: 1 };
 
 		let writer = test_channel.get_writer();
 		let reader = test_channel.get_reader();
 		let events = reader.read().collect::<Vec<&TestEvent>>();
-		assert_eq!(events, Vec::<&TestEvent>::new(), "initial events empty");
+		assert_eq!(events, Vec::<&TestEvent>::default(), "initial events empty");
 
 		writer.send(event0);
 		test_channel.flush();
@@ -252,19 +252,19 @@ mod tests
 		let events = reader2.read().collect::<Vec<&TestEvent>>();
 		assert_eq!(
 			events,
-			Vec::<&TestEvent>::new(),
+			Vec::<&TestEvent>::default(),
 			"Cannot read event multiple times"
 		);
 
 		test_channel.flush();
 		let events = reader2.read().collect::<Vec<&TestEvent>>();
-		assert_eq!(events, Vec::<&TestEvent>::new());
+		assert_eq!(events, Vec::<&TestEvent>::default());
 	}
 
 	#[test]
 	fn sync_001()
 	{
-		let channel = Arc::new(SyncEventChannel::<TestEvent>::new());
+		let channel = Arc::new(SyncEventChannel::<TestEvent>::default());
 		let total = Arc::new(Mutex::new(0));
 		let total_loc = Arc::clone(&total);
 		let c = Arc::clone(&channel);
@@ -304,7 +304,7 @@ mod tests
 	/// test waiting for new events
 	fn sync_002()
 	{
-		let channel = Arc::new(SyncEventChannel::<()>::new());
+		let channel = Arc::new(SyncEventChannel::<()>::default());
 		let total_loc = Arc::new(Mutex::new(0));
 
 		let total = Arc::clone(&total_loc);
@@ -340,7 +340,7 @@ mod tests
 	/// test waiting for flush
 	fn sync_003()
 	{
-		let channel = Arc::new(SyncEventChannel::<()>::new());
+		let channel = Arc::new(SyncEventChannel::<()>::default());
 		let total_loc = Arc::new(Mutex::new(0));
 
 		let total = Arc::clone(&total_loc);
@@ -398,7 +398,7 @@ mod tests
 	/// test dropping the writer
 	fn sync_004()
 	{
-		let channel = Arc::new(SyncEventChannel::<()>::new());
+		let channel = Arc::new(SyncEventChannel::<()>::default());
 		let total_loc = Arc::new(Mutex::new(0));
 
 		let total = Arc::clone(&total_loc);

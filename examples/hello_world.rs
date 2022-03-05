@@ -15,9 +15,9 @@ fn main()
 	let mut app = App::new();
 	let window = window::create_window();
 
-	let channel_button = SyncEventChannel::<ButtonEvent>::new();
-	let channel_mouse = SyncEventChannel::<MouseEvent>::new();
-	let channel_window = SyncEventChannel::<WindowEvent>::new();
+	let channel_button = SyncEventChannel::<ButtonEvent>::default();
+	let channel_mouse = SyncEventChannel::<MouseEvent>::default();
+	let channel_window = SyncEventChannel::<WindowEvent>::default();
 	app.world.set_resource(channel_button).unwrap();
 	app.world.set_resource(channel_mouse).unwrap();
 	app.world.set_resource(channel_window).unwrap();

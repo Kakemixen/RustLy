@@ -7,6 +7,11 @@ pub(crate) enum ReadableEventBuffer
 	B,
 }
 
+impl Default for ReadableEventBuffer
+{
+	fn default() -> Self { ReadableEventBuffer::A }
+}
+
 /// Single-threaded event channel
 pub struct EventChannel<T>
 {
@@ -16,6 +21,21 @@ pub struct EventChannel<T>
 	pub(crate) start_idx_b: UnsafeCell<usize>,
 	pub(crate) readable_buffer: UnsafeCell<ReadableEventBuffer>,
 	writers: UnsafeCell<usize>,
+}
+
+impl<T> Default for EventChannel<T>
+{
+	fn default() -> Self
+	{
+		EventChannel {
+			events_a: UnsafeCell::new(Vec::new()), // maybe sensible initial?
+			events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
+			start_idx_a: UnsafeCell::new(0),
+			start_idx_b: UnsafeCell::new(0),
+			readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
+			writers: UnsafeCell::new(0),
+		}
+	}
 }
 
 /// Single-threaded event writer
@@ -39,19 +59,6 @@ pub struct EventReader<'a, T>
 
 impl<T> EventChannel<T>
 {
-	/// Creates empty event channel
-	pub fn new() -> EventChannel<T>
-	{
-		EventChannel {
-			events_a: UnsafeCell::new(Vec::new()), // maybe sensible initial?
-			events_b: UnsafeCell::new(Vec::new()), // maybe sensible initial?
-			start_idx_a: UnsafeCell::new(0),
-			start_idx_b: UnsafeCell::new(0),
-			readable_buffer: UnsafeCell::new(ReadableEventBuffer::A),
-			writers: UnsafeCell::new(0),
-		}
-	}
-
 	/// Sends the event on the channel
 	pub(crate) fn send(&self, e: T)
 	{
