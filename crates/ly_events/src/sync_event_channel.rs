@@ -1,4 +1,5 @@
 use crossbeam::sync::{Parker, Unparker};
+use ly_log::core_prelude::*;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
@@ -15,6 +16,7 @@ use crate::event_signal;
 /// threads, keep in mind the reader has a borrow to the channel.
 pub struct SyncEventChannel<T>
 {
+	channel_id: usize,
 	channel: EventChannel<T>,
 	write_mutex: Mutex<()>,
 	flush_mutex: RwLock<()>,
@@ -23,11 +25,15 @@ pub struct SyncEventChannel<T>
 	writers: UnsafeCell<AtomicUsize>,
 }
 
+static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 impl<T> Default for SyncEventChannel<T>
 {
 	fn default() -> Self
 	{
+		let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+		core_debug!("constructing channel {}", id);
 		SyncEventChannel {
+			channel_id: id,
 			channel: EventChannel::default(),
 			write_mutex: Mutex::new(()),
 			flush_mutex: RwLock::new(()),
@@ -119,7 +125,8 @@ impl<T> SyncEventChannel<T>
 		let _lock = self.write_mutex.lock();
 		self.channel.send(e);
 		unsafe {
-			event_signal::signal_waiters(&mut *self.new_event_waiters.get());
+			let waiters = &mut *self.new_event_waiters.get();
+			event_signal::signal_waiters(waiters);
 		}
 	}
 
@@ -147,6 +154,7 @@ impl<T> SyncEventChannel<T>
 	/// Creates a writer for this channel
 	pub fn get_writer(&self) -> SyncEventWriter<T>
 	{
+		core_debug!("getting writer for channel {}", self.channel_id);
 		unsafe {
 			let writers = self.writers.get();
 			(*writers).fetch_add(1, Ordering::Relaxed);
@@ -157,6 +165,7 @@ impl<T> SyncEventChannel<T>
 	/// Creates a reader for this channel
 	pub fn get_reader(&self) -> SyncEventReader<T>
 	{
+		core_debug!("getting reader for channel {}", self.channel_id);
 		SyncEventReader {
 			read_events: UnsafeCell::new(1), // avoid stupid stuff when read=0
 			channel: self,

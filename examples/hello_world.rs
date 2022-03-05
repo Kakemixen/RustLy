@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicUsize;
+
 use ly_app::World;
 use ly_events::channel::wait_any_new;
 use rustly::app::App;
@@ -24,6 +26,7 @@ fn main()
 	app.world
 		.create_resource::<SyncEventChannel<WindowEvent>>()
 		.unwrap();
+	app.world.create_resource::<AtomicUsize>().unwrap();
 
 	let runner = window.get_app_runner();
 	app.add_process(thing_i_want_to_do);
@@ -56,6 +59,10 @@ fn thing_i_want_to_do(world: &World)
 
 		reader_b.flush_channel();
 		for event in reader_b.read() {
+			if let ButtonEvent::MousePressed(ly_input::MouseButton::Left) = event {
+				let count = world.get_resource::<AtomicUsize>().unwrap();
+				debug!("number of updates {:?}", count);
+			}
 			info!("recieved {:?}", event);
 		}
 
@@ -65,9 +72,11 @@ fn thing_i_want_to_do(world: &World)
 		}
 
 		if !reader_b.channel_has_writers() {
+			warning!("button no longer has readers");
 			break;
 		}
 		if !reader_m.channel_has_writers() {
+			warning!("mouse no longer has readers");
 			break;
 		}
 	}

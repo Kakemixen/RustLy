@@ -4,7 +4,10 @@ pub use world::World;
 
 use crossbeam::thread::scope;
 use ly_log::core_prelude::*;
-use std::process::exit;
+use std::{
+	process::exit,
+	sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub type AppRunner = dyn FnOnce(App);
 //pub type AppSubProcess = dyn FnOnce(&'static World) -> () + Send;
@@ -51,6 +54,14 @@ impl App
 		}
 		log_die("App has stopped".to_string());
 		exit(exit_code);
+	}
+
+	/// Update tick for application
+	pub fn update(&mut self)
+	{
+		if let Ok(count) = &mut self.world.get_resource::<AtomicUsize>() {
+			count.fetch_add(1, Ordering::Relaxed);
+		}
 	}
 
 	/// Used to set a run function for this app.

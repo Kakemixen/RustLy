@@ -10,3 +10,4 @@ parking_lot = "0.12.0"
 crossbeam = "0.8.1"
 
 ly_input = { path = "../ly_input" }
+ly_log = { path = "../ly_log" }

@@ -4,7 +4,7 @@ mod winit_converters;
 use winit_converters as converters;
 
 use ly_app::{App, AppRunner};
-use ly_events::channel::{SyncEventChannel, SyncEventWriter};
+use ly_events::channel::SyncEventChannel;
 use ly_events::types::{ButtonEvent, MouseEvent, WindowEvent};
 use ly_log::core_prelude::*;
 use winit::event;
@@ -50,27 +50,11 @@ impl LyWindow
 		end_handler();
 	}
 
+	/// Consumes window to generate a runner for [`App`](ly_app::App)
 	pub fn get_app_runner(self) -> Box<AppRunner>
 	{
 		let closure = move |app: App| {
-			let writer_window = app
-				.world
-				.get_resource::<SyncEventChannel<WindowEvent>>()
-				.unwrap()
-				.get_writer();
-			let writer_button = app
-				.world
-				.get_resource::<SyncEventChannel<ButtonEvent>>()
-				.unwrap()
-				.get_writer();
-			let writer_mouse = app
-				.world
-				.get_resource::<SyncEventChannel<MouseEvent>>()
-				.unwrap()
-				.get_writer();
-
-			let event_handler =
-				get_sync_forwarding_event_loop(writer_window, writer_button, writer_mouse);
+			let event_handler = get_sync_forwarding_event_loop(app);
 			self.run(event_handler, Box::new(|| ()))
 		};
 		Box::new(closure)
@@ -91,12 +75,24 @@ pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 	})
 }
 
-pub fn get_sync_forwarding_event_loop<'a>(
-	writer_window: SyncEventWriter<'a, WindowEvent>,
-	writer_button: SyncEventWriter<'a, ButtonEvent>,
-	writer_mouse: SyncEventWriter<'a, MouseEvent>,
-) -> Box<dyn EventHandler + 'a>
+pub fn get_sync_forwarding_event_loop<'a>(mut app: App) -> Box<dyn EventHandler + 'a>
 {
+	let writer_window = app
+		.world
+		.get_resource::<SyncEventChannel<WindowEvent>>()
+		.unwrap()
+		.get_writer();
+	let writer_button = app
+		.world
+		.get_resource::<SyncEventChannel<ButtonEvent>>()
+		.unwrap()
+		.get_writer();
+	let writer_mouse = app
+		.world
+		.get_resource::<SyncEventChannel<MouseEvent>>()
+		.unwrap()
+		.get_writer();
+
 	Box::new(
 		move |event, _, control_flow: &mut ControlFlow| match event {
 			event::Event::WindowEvent {
@@ -130,7 +126,7 @@ pub fn get_sync_forwarding_event_loop<'a>(
 				writer_mouse.send(converters::convert_mouse_move(delta));
 			}
 			event::Event::MainEventsCleared => {}
-			_ => (),
+			_ => app.update(),
 		},
 	)
 }
