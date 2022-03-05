@@ -101,7 +101,7 @@ pub fn wait_any_new(readers: &[&dyn EventWaiter])
 {
 	let p = Parker::new();
 	for reader in readers {
-		if let Err(_) = reader.add_unparker_new(&p) {
+		if reader.add_unparker_new(&p).is_err() {
 			return;
 		}
 	}

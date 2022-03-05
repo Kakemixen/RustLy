@@ -56,20 +56,12 @@ fn thing_i_want_to_do(world: &World)
 
 		reader_b.flush_channel();
 		for event in reader_b.read() {
-			match event {
-				e => {
-					info!("recieved {:?}", e);
-				}
-			}
+			info!("recieved {:?}", event);
 		}
 
 		reader_m.flush_channel();
 		for event in reader_m.read() {
-			match event {
-				e => {
-					info!("recieved {:?}", e);
-				}
-			}
+			info!("recieved {:?}", event);
 		}
 
 		if !reader_b.channel_has_writers() {

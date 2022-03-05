@@ -1,6 +1,7 @@
 use crossbeam::sync::{Parker, Unparker};
 use parking_lot::Mutex;
 
+#[derive(Default)]
 pub struct SignalEvent
 {
 	waiters: Mutex<Vec<Unparker>>,
@@ -8,13 +9,6 @@ pub struct SignalEvent
 
 impl SignalEvent
 {
-	pub fn new() -> SignalEvent
-	{
-		SignalEvent {
-			waiters: Mutex::new(Vec::new()),
-		}
-	}
-
 	/// Signal waiting threads to wake
 	pub fn signal(&self)
 	{
@@ -60,7 +54,7 @@ mod tests
 	{
 		let total = Arc::new(Mutex::new(0));
 		let t = Arc::clone(&total);
-		let signal = Arc::new(SignalEvent::new());
+		let signal = Arc::new(SignalEvent::default());
 		let s = Arc::clone(&signal);
 
 		let adder = thread::spawn(move || {

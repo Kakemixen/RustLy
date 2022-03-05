@@ -27,17 +27,17 @@ mod sync_event_channel;
 /// # use std::sync::atomic::{AtomicBool, Ordering};
 /// # use std::thread;
 /// # use std::time::Duration;
-/// let signal = Arc::new(SignalEvent::new());
+/// let signal = Arc::new(SignalEvent::default());
 /// let s = Arc::clone(&signal);
 /// let running = Arc::new(AtomicBool::new(false));
 /// let r = Arc::clone(&running);
 ///
 /// let adder = thread::spawn(move || {
-/// 	// Do stuff before wait
-/// 	s.wait();
-/// 	r.store(true, Ordering::Relaxed);
-/// 	s.signal();
-/// 	// Do stuff after wake
+///     // Do stuff before wait
+///     s.wait();
+///     r.store(true, Ordering::Relaxed);
+///     s.signal();
+///     // Do stuff after wake
 /// });
 ///
 /// // do some stuff so that the other thread have entered wait()
@@ -89,23 +89,23 @@ pub mod signal
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, Vec::<&TestEvent>::default(),
-/// 	"initial events empty");
+///     "initial events empty");
 ///
 /// writer.send(event);
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, Vec::<&TestEvent>::default(),
-/// 	"still emply after send");
+///     "still emply after send");
 ///
 /// test_channel.flush();
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, [&event_clone],
-/// 	"reader can read flushed event");
+///     "reader can read flushed event");
 ///
 /// let events = reader.read().collect::<Vec<&TestEvent>>();
 /// assert_eq!(events, Vec::<&TestEvent>::default(),
-/// 	"cannot read twice");
+///     "cannot read twice");
 /// ```
 ///
 /// ## Sync options
@@ -130,11 +130,11 @@ pub mod signal
 ///
 /// let c = Arc::clone(&channel);
 /// thread::spawn(move || {
-/// 	let reader = c.get_reader();
-/// 	reader.flush_channel();
-/// 	for event in reader.read() {
-/// 		// do stuff
-/// 	}
+///     let reader = c.get_reader();
+///     reader.flush_channel();
+///     for event in reader.read() {
+///         // do stuff
+///     }
 /// });
 /// ```
 ///

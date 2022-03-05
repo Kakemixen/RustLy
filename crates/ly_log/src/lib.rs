@@ -98,18 +98,15 @@ fn print_log_event(event: LogEvent)
 	};
 
 	println!(
-		"{}",
-		format!(
-			"[{:7}{}{}] {}:{} - {}",
-			levelstr,
-			corestr,
-			blockingstr,
-			event.file,
-			event.line,
-			event
-				.message
-				.replace("\n", &format!("\n[   -   {}{}] ", corestr, blockingstr))
-		)
+		"[{:7}{}{}] {}:{} - {}",
+		levelstr,
+		corestr,
+		blockingstr,
+		event.file,
+		event.line,
+		event
+			.message
+			.replace('\n', &format!("\n[   -   {}{}] ", corestr, blockingstr))
 	);
 }
 
@@ -121,13 +118,10 @@ fn print_log_die(msg: String, condpair: CondPair)
 	let corestr = " LY".magenta();
 
 	println!(
-		"{}",
-		format!(
-			"[{:7}{}] Stopping log thread - {}",
-			levelstr,
-			corestr,
-			msg.replace("\n", &format!("\n[   -   {}] ", corestr))
-		)
+		"[{:7}{}] Stopping log thread - {}",
+		levelstr,
+		corestr,
+		msg.replace('\n', &format!("\n[   -   {}] ", corestr))
 	);
 	let (lock, cvar) = &*condpair;
 	let mut finished = lock.lock();
@@ -241,12 +235,11 @@ impl Logger
 	fn new() -> Self
 	{
 		let (tx, condpair) = init_channel();
-		let logger = Logger {
+		Logger {
 			transmitter: ThreadLocal::new(),
 			tx_main: tx,
 			condpair,
-		};
-		logger
+		}
 	}
 }
 

@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use state::container::ContainerSendSync;
 
 static CONTAINER: ContainerSendSync = ContainerSendSync::new();
@@ -21,7 +23,7 @@ impl World
 	/// Returns Err if a resource of that type is set already.
 	/// In that case, the resource storage is not updated,
 	/// should you require mutability, use interior for now.
-	pub fn set_resource<T>(&self, resource: T) -> Result<(), ()>
+	pub fn set_resource<T>(&self, resource: T) -> Result<(), Box<dyn Error>>
 	where
 		T: Send + Sync + 'static,
 	{
@@ -29,7 +31,7 @@ impl World
 			Ok(())
 		}
 		else {
-			Err(())
+			Err("Resource already set".into())
 		}
 	}
 
@@ -37,7 +39,7 @@ impl World
 	/// Returns Err if a resource of that type is set already.
 	/// In that case, the resource storage is not updated,
 	/// should you require mutability, use interior for now.
-	pub fn create_resource<T>(&self) -> Result<(), ()>
+	pub fn create_resource<T>(&self) -> Result<(), Box<dyn Error>>
 	where
 		T: Send + Sync + 'static + Default,
 	{
@@ -45,18 +47,23 @@ impl World
 			Ok(())
 		}
 		else {
-			Err(())
+			Err("Resource already set".into())
 		}
 	}
 
 	/// Get a resource from the global storage.
 	/// Returns Err if no resource of that type exists.
-	pub fn get_resource<T>(&self) -> Result<&'static T, ()>
+	pub fn get_resource<T>(&self) -> Result<&'static T, Box<dyn Error>>
 	where
 		T: Send + Sync + 'static,
 	{
 		let ret = self.resources.try_get();
-		if let Some(v) = ret { Ok(v) } else { Err(()) }
+		if let Some(v) = ret {
+			Ok(v)
+		}
+		else {
+			Err("No suce resource".into())
+		}
 	}
 }
 

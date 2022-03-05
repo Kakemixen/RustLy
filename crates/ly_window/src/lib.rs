@@ -42,7 +42,7 @@ pub fn create_window() -> LyWindow
 
 impl LyWindow
 {
-	pub fn run<E>(mut self, event_handler: E, end_handler: Box<dyn FnOnce() -> ()>)
+	pub fn run<E>(mut self, event_handler: E, end_handler: Box<dyn FnOnce()>)
 	where
 		E: EventHandler,
 	{
@@ -79,18 +79,16 @@ impl LyWindow
 
 pub fn get_empty_event_loop() -> Box<dyn EventHandler>
 {
-	Box::new(
-		move |event, _, control_flow: &mut ControlFlow| match event {
-			event::Event::WindowEvent {
-				event: event::WindowEvent::CloseRequested,
-				..
-			} => {
-				println!("The close button was pressed; stopping");
-				*control_flow = ControlFlow::Exit;
-			}
-			_ => (),
-		},
-	)
+	Box::new(move |event, _, control_flow: &mut ControlFlow| {
+		if let event::Event::WindowEvent {
+			event: event::WindowEvent::CloseRequested,
+			..
+		} = event
+		{
+			println!("The close button was pressed; stopping");
+			*control_flow = ControlFlow::Exit;
+		}
+	})
 }
 
 pub fn get_sync_forwarding_event_loop<'a>(
@@ -126,14 +124,11 @@ pub fn get_sync_forwarding_event_loop<'a>(
 				_ => (),
 			},
 			event::Event::DeviceEvent {
-				event,
+				event: event::DeviceEvent::MouseMotion { delta },
 				device_id: _winit_device_id,
-			} => match event {
-				event::DeviceEvent::MouseMotion { delta } => {
-					writer_mouse.send(converters::convert_mouse_move(delta));
-				}
-				_ => (),
-			},
+			} => {
+				writer_mouse.send(converters::convert_mouse_move(delta));
+			}
 			event::Event::MainEventsCleared => {}
 			_ => (),
 		},

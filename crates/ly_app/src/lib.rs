@@ -6,9 +6,9 @@ use crossbeam::thread::scope;
 use ly_log::core_prelude::*;
 use std::process::exit;
 
-pub type AppRunner = dyn FnOnce(App) -> ();
+pub type AppRunner = dyn FnOnce(App);
 //pub type AppSubProcess = dyn FnOnce(&'static World) -> () + Send;
-pub type AppSubProcess = fn(&World) -> ();
+pub type AppSubProcess = fn(&World);
 
 /// The Application, should be only one
 #[derive(Default)]
