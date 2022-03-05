@@ -469,6 +469,7 @@ dependencies = [
 name = "ly_app"
 version = "0.1.0"
 dependencies = [
+ "crossbeam",
  "ly_log",
  "state",
 ]

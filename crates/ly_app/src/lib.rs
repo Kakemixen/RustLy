@@ -2,10 +2,13 @@ mod world;
 
 pub use world::World;
 
+use crossbeam::thread::scope;
 use ly_log::core_prelude::*;
 use std::process::exit;
 
 pub type AppRunner = dyn FnOnce(App) -> ();
+//pub type AppSubProcess = dyn FnOnce(&'static World) -> () + Send;
+pub type AppSubProcess = fn(&World) -> ();
 
 /// The Application, should be only one
 #[derive(Default)]
@@ -13,6 +16,7 @@ pub struct App
 {
 	pub world: World,
 	runner: Option<Box<AppRunner>>,
+	processes: Option<Vec<AppSubProcess>>,
 }
 
 impl App
@@ -30,7 +34,16 @@ impl App
 	{
 		let mut exit_code = 0;
 		if let Some(runner) = self.runner.take() {
-			runner(self);
+			scope(|s| {
+				if let Some(procs) = self.processes.take() {
+					for p in procs.into_iter() {
+						let world = self.get_world_handle();
+						s.spawn(move |_| p(world));
+					}
+				}
+				runner(self);
+			})
+			.unwrap();
 		}
 		else {
 			core_error!("No runner set, stopping!");
@@ -43,4 +56,28 @@ impl App
 	/// Used to set a run function for this app.
 	/// This fun
 	pub fn set_runner(&mut self, runner: Box<AppRunner>) { self.runner = Some(runner); }
+
+	/// Add a subprocess to the app.
+	/// The provided fn will we run in a separate thread and joined upon
+	/// application exit
+	pub fn add_process(&mut self, func: AppSubProcess)
+	{
+		if let Some(procs) = &mut self.processes {
+			procs.push(func);
+		}
+		else {
+			self.processes = Some(vec![func]);
+		}
+	}
+
+	/// Gets a world handle to be passed to subprocess
+	/// TODO: create system to pass resources to subprocess instead of the world
+	fn get_world_handle(&self) -> &'static World
+	{
+		// SAFE: only used for scoped threads in the app
+		unsafe {
+			let ptr = &self.world as *const World;
+			&*ptr
+		}
+	}
 }
