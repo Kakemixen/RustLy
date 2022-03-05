@@ -33,6 +33,22 @@ impl World
 		}
 	}
 
+	/// Inserts a default-initialized object into the global storage.
+	/// Returns Err if a resource of that type is set already.
+	/// In that case, the resource storage is not updated,
+	/// should you require mutability, use interior for now.
+	pub fn create_resource<T>(&self) -> Result<(), ()>
+	where
+		T: Send + Sync + 'static + Default,
+	{
+		if self.resources.set(T::default()) {
+			Ok(())
+		}
+		else {
+			Err(())
+		}
+	}
+
 	/// Get a resource from the global storage.
 	/// Returns Err if no resource of that type exists.
 	pub fn get_resource<T>(&self) -> Result<&'static T, ()>
