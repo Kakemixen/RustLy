@@ -1,5 +1,6 @@
 mod world;
 
+use parking_lot::Mutex;
 pub use world::World;
 
 use crossbeam::thread::scope;
@@ -20,12 +21,48 @@ pub struct App
 	systems: Vec<AppSubProcess>,
 }
 
+/// The state of the application
+#[derive(Clone, Copy)]
+pub enum AppState
+{
+	Initialized,
+	Running,
+	Idle,
+	Stopped,
+}
+
+/// Information about app intended to keep in storage
+pub struct AppInfo
+{
+	state: Mutex<AppState>,
+}
+
+impl AppInfo
+{
+	fn new_initialized() -> Self
+	{
+		AppInfo {
+			state: Mutex::new(AppState::Initialized),
+		}
+	}
+
+	/// Get the current state of the application
+	pub fn state(&self) -> AppState { *self.state.lock() }
+
+	/// Sets new state for application
+	fn set_state(&self, state: AppState) { *self.state.lock() = state; }
+}
+
 impl App
 {
 	pub fn new() -> Self
 	{
 		log_init();
-		App::default()
+		let app = App::default();
+		if let Err(e) = app.world.set_resource(AppInfo::new_initialized()) {
+			core_error!("Could not initialize AppInfo correctly due to {}", e)
+		}
+		app
 	}
 
 	/// Runs the application.
@@ -35,6 +72,11 @@ impl App
 	{
 		let mut exit_code = 0;
 		if let Some(runner) = self.runner.take() {
+			let world = self.get_world_handle();
+			world
+				.get_resource::<AppInfo>()
+				.unwrap()
+				.set_state(AppState::Running);
 			scope(|s| {
 				if let Some(procs) = self.processes.take() {
 					for p in procs.into_iter() {
@@ -43,6 +85,10 @@ impl App
 					}
 				}
 				runner(self);
+				world
+					.get_resource::<AppInfo>()
+					.unwrap()
+					.set_state(AppState::Stopped);
 			})
 			.unwrap();
 		}

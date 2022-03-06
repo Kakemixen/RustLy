@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use ly_app::World;
+use ly_app::{AppInfo, AppState, World};
 use ly_events::channel::wait_any_new;
 use rustly::app::App;
 use rustly::events::channel::EventWaiter;
@@ -8,6 +8,7 @@ use rustly::events::channel::SyncEventChannel;
 use rustly::events::types::{ButtonEvent, MouseEvent, WindowEvent};
 use rustly::log::*;
 use rustly::window;
+use std::thread;
 
 #[derive(Debug)]
 struct MyEvent {}
@@ -60,7 +61,12 @@ fn thing_i_want_to_do(world: &World)
 		//reader_b.wait_new();
 
 		debug!("waiting...");
-		wait_any_new(&arr);
+		//wait_any_new(&arr);
+		thread::sleep_ms(500);
+		if let AppState::Stopped = world.get_resource::<AppInfo>().unwrap().state() {
+			info!("Application quit, breaking read loop!");
+			break;
+		}
 		//wait_any_new(&[&reader_b as &dyn EventWaiter]);
 		debug!("got new...");
 

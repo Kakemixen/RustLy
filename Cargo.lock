@@ -471,6 +471,7 @@ version = "0.1.0"
 dependencies = [
  "crossbeam",
  "ly_log",
+ "parking_lot 0.12.0",
  "state",
 ]
 
