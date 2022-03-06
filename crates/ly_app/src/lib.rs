@@ -111,12 +111,12 @@ impl App
 	}
 
 	/// Used to set a run function for this app.
-	/// This fun
 	pub fn set_runner(&mut self, runner: Box<AppRunner>) { self.runner = Some(runner); }
 
 	/// Add a subprocess to the app.
 	/// The provided fn will we run in a separate thread and joined upon
-	/// application exit
+	/// application exit, so if the function never returns, the application
+	/// hangs
 	pub fn add_process(&mut self, func: AppSubProcess)
 	{
 		if let Some(procs) = &mut self.processes {

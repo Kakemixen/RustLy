@@ -4,6 +4,7 @@ use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use std::cell::UnsafeCell;
 use std::slice::Iter;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use crate::channel::{EventChannel, ReadableEventBuffer};
 use crate::event_signal;
@@ -112,6 +113,18 @@ pub fn wait_any_new(readers: &[&dyn EventWaiter])
 		}
 	}
 	p.park();
+}
+
+/// Like [`wait_any_new`], but with a timeout in ms
+pub fn wait_any_new_timeout(readers: &[&dyn EventWaiter], timeout_ms: u64)
+{
+	let p = Parker::new();
+	for reader in readers {
+		if reader.add_unparker_new(&p).is_err() {
+			return;
+		}
+	}
+	p.park_timeout(Duration::from_millis(timeout_ms));
 }
 
 impl<T> SyncEventChannel<T>
@@ -301,6 +314,24 @@ impl<'a, T> SyncEventReader<'a, T>
 			event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), &p);
 			drop(_lock);
 			p.park();
+		}
+	}
+
+	/// Waits for un-flushed events to be present
+	///
+	/// Like [`wait_new`](SyncEventReader::wait_new), with a timeout in ms
+	pub fn wait_new_timeout(&self, timeout_ms: u64)
+	{
+		let _lock = self.channel.write_mutex.lock();
+		if self.channel.has_new_events() {
+			return;
+		}
+
+		unsafe {
+			let p = Parker::new();
+			event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), &p);
+			drop(_lock);
+			p.park_timeout(Duration::from_millis(timeout_ms));
 		}
 	}
 
