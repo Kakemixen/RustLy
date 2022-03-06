@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{any::type_name, error::Error};
 
 use state::container::ContainerSendSync;
 
@@ -31,7 +31,7 @@ impl World
 			Ok(())
 		}
 		else {
-			Err("Resource already set".into())
+			Err(format!("Resource already set {}", type_name::<T>()).into())
 		}
 	}
 
@@ -47,7 +47,7 @@ impl World
 			Ok(())
 		}
 		else {
-			Err("Resource already set".into())
+			Err(format!("Resource already set {}", type_name::<T>()).into())
 		}
 	}
 
@@ -62,7 +62,7 @@ impl World
 			Ok(v)
 		}
 		else {
-			Err("No suce resource".into())
+			Err(format!("No such resource {}", type_name::<T>()).into())
 		}
 	}
 }

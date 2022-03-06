@@ -15,16 +15,13 @@ struct MyEvent {}
 fn main()
 {
 	let mut app = App::new();
-	let window = window::create_window();
+	let window = window::create_window().unwrap();
 
 	app.world
 		.create_resource::<SyncEventChannel<ButtonEvent>>()
 		.unwrap();
 	app.world
 		.create_resource::<SyncEventChannel<MouseEvent>>()
-		.unwrap();
-	app.world
-		.create_resource::<SyncEventChannel<WindowEvent>>()
 		.unwrap();
 	app.world.create_resource::<AtomicUsize>().unwrap();
 
@@ -62,8 +59,10 @@ fn thing_i_want_to_do(world: &World)
 		// wait_new solves it here, but not root cause
 		//reader_b.wait_new();
 
+		debug!("waiting...");
 		wait_any_new(&arr);
 		//wait_any_new(&[&reader_b as &dyn EventWaiter]);
+		debug!("got new...");
 
 		reader_b.flush_channel();
 		for event in reader_b.read() {

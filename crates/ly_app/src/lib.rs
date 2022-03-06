@@ -4,10 +4,7 @@ pub use world::World;
 
 use crossbeam::thread::scope;
 use ly_log::core_prelude::*;
-use std::{
-	process::exit,
-	sync::atomic::{AtomicUsize, Ordering},
-};
+use std::process::exit;
 
 pub type AppRunner = dyn FnOnce(App);
 //pub type AppSubProcess = dyn FnOnce(&'static World) -> () + Send;
@@ -53,6 +50,8 @@ impl App
 			core_error!("No runner set, stopping!");
 			exit_code = 1;
 		}
+
+		// exit cleanup
 		log_die("App has stopped".to_string());
 		exit(exit_code);
 	}
