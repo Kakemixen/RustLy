@@ -1,15 +1,11 @@
 [package]
-name = "ly_window"
+name = "ly_renderer"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-winit = "0.26.1"
+ash = "0.30.0"
+ash-window = "0.9.1"
 raw-window-handle = "0.4.2"
-
-ly_app = { path = "../ly_app" }
-ly_events = { path = "../ly_events" }
-ly_input = { path = "../ly_input" }
-ly_log = { path = "../ly_log" }

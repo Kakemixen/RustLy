@@ -13,6 +13,7 @@ ly_app = { path = "crates/ly_app" }
 ly_events = { path = "crates/ly_events" }
 ly_input = { path = "crates/ly_input" }
 ly_log = { path = "crates/ly_log" }
+ly_renderer = { path = "crates/ly_renderer" }
 ly_window = { path = "crates/ly_window" }
 
 [[example]]

@@ -12,6 +12,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "ash"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69daec0742947f33a85931fa3cb0ce5f07929159dcbd1f0cbb5b2912e2978509"
+dependencies = [
+ "libloading 0.5.2",
+]
+
+[[package]]
+name = "ash"
+version = "0.36.0+1.3.206"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ceea9c64653169f33f946debf0a41568afc4e23a4c37d29004a23b2ffbfb4034"
+
+[[package]]
+name = "ash-window"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed540473cca5a9a40466521ec2fd0cfe5083173bf736a15a4580be523842ff93"
+dependencies = [
+ "ash 0.36.0+1.3.206",
+ "raw-window-handle 0.3.4",
+ "raw-window-metal",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -319,7 +345,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1b7517328c04c2aa68422fc60a41b92208182142ed04a25879c26c8f878794"
 dependencies = [
- "libloading",
+ "libloading 0.7.3",
 ]
 
 [[package]]
@@ -424,6 +450,16 @@ checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "libloading"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
+dependencies = [
+ "cc",
+ "winapi",
+]
+
+[[package]]
+name = "libloading"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efbc0f03f9a775e9f6aed295c6a1ba2253c5757a9e03d55c6caa46a681abcddd"
@@ -500,6 +536,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ly_renderer"
+version = "0.1.0"
+dependencies = [
+ "ash 0.30.0",
+ "ash-window",
+ "raw-window-handle 0.4.2",
+]
+
+[[package]]
 name = "ly_window"
 version = "0.1.0"
 dependencies = [
@@ -507,6 +552,7 @@ dependencies = [
  "ly_events",
  "ly_input",
  "ly_log",
+ "raw-window-handle 0.4.2",
  "winit",
 ]
 
@@ -798,11 +844,33 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e28f55143d0548dad60bb4fbdc835a3d7ac6acc3324506450c5fdd6e42903a76"
+dependencies = [
+ "libc",
+ "raw-window-handle 0.4.2",
+]
+
+[[package]]
+name = "raw-window-handle"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fba75eee94a9d5273a68c9e1e105d9cffe1ef700532325788389e5a83e2522b7"
 dependencies = [
  "cty",
+]
+
+[[package]]
+name = "raw-window-metal"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cd21ed1cdef7f1b1579b972148ba6058b5b545959a14d91ea83c4f0ea9f289b"
+dependencies = [
+ "cocoa",
+ "core-graphics 0.22.3",
+ "objc",
+ "raw-window-handle 0.3.4",
 ]
 
 [[package]]
@@ -846,6 +914,7 @@ dependencies = [
  "ly_events",
  "ly_input",
  "ly_log",
+ "ly_renderer",
  "ly_window",
 ]
 
@@ -1307,7 +1376,7 @@ dependencies = [
  "objc",
  "parking_lot 0.11.2",
  "percent-encoding",
- "raw-window-handle",
+ "raw-window-handle 0.4.2",
  "smithay-client-toolkit",
  "wasm-bindgen",
  "wayland-client",
