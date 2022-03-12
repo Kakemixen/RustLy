@@ -63,7 +63,10 @@ impl LyWindow
 		let closure = move |app: App| match get_sync_forwarding_event_loop(app) {
 			Ok(event_handler) => self.run(event_handler),
 			Err(e) => {
-				core_error!("winit event loop does not have required resources: {}", e)
+				core_error!(
+					"winit event loop does not have required resources: \n\t{}",
+					e
+				)
 			}
 		};
 		Box::new(closure)

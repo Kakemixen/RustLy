@@ -76,6 +76,9 @@ pub trait EventWaiter
 	///
 	/// Returns an error if not all current events are handled
 	fn add_unparker_new(&self, p: &Parker) -> Result<(), String>;
+
+	/// Get number of things that can wake the waiter
+	fn get_num_wakers(&self) -> usize;
 }
 
 impl<'a, T> EventWaiter for SyncEventReader<'a, T>
@@ -95,36 +98,48 @@ impl<'a, T> EventWaiter for SyncEventReader<'a, T>
 			Ok(())
 		}
 	}
+
+	fn get_num_wakers(&self) -> usize { self.channel.get_num_writers() }
+}
+
+fn accumulate_wakers(waiters: &[&dyn EventWaiter]) -> usize
+{
+	waiters
+		.iter()
+		.fold(0, |acc, waiter| acc + waiter.get_num_wakers())
 }
 
 /// Wait for any events to be sent to the channels of the passed
-/// [`EventWaiter`]s
+/// [`EventWaiter`]s.
+/// Returns the total number of objects capable of waking the waiters.
 ///
 /// The trait object is used to enable iteration over multiple channel types,
 /// perhaps there's a better way, but I don't know about it.
 ///
 /// If any channels has unread events, it will return directly, without waiting
-pub fn wait_any_new(readers: &[&dyn EventWaiter])
+pub fn wait_any_new(readers: &[&dyn EventWaiter]) -> usize
 {
 	let p = Parker::new();
 	for reader in readers {
 		if reader.add_unparker_new(&p).is_err() {
-			return;
+			return accumulate_wakers(readers);
 		}
 	}
 	p.park();
+	accumulate_wakers(readers)
 }
 
 /// Like [`wait_any_new`], but with a timeout in ms
-pub fn wait_any_new_timeout(readers: &[&dyn EventWaiter], timeout_ms: u64)
+pub fn wait_any_new_timeout(readers: &[&dyn EventWaiter], timeout_ms: u64) -> usize
 {
 	let p = Parker::new();
 	for reader in readers {
 		if reader.add_unparker_new(&p).is_err() {
-			return;
+			return accumulate_wakers(readers);
 		}
 	}
 	p.park_timeout(Duration::from_millis(timeout_ms));
+	accumulate_wakers(readers)
 }
 
 impl<T> SyncEventChannel<T>
@@ -192,19 +207,22 @@ impl<T> SyncEventChannel<T>
 		unsafe {
 			let buffer = self.channel.readable_buffer.get();
 			match *buffer {
+				// TODO this seems weird, look into it
 				ReadableEventBuffer::A => !(*self.channel.events_b.get()).is_empty(),
 				ReadableEventBuffer::B => !(*self.channel.events_a.get()).is_empty(),
 			}
 		}
 	}
 
-	fn has_writers(&self) -> bool
+	fn get_num_writers(&self) -> usize
 	{
 		unsafe {
 			let writers = self.writers.get();
-			(*writers).load(Ordering::Relaxed) != 0
+			(*writers).load(Ordering::Relaxed)
 		}
 	}
+
+	fn has_writers(&self) -> bool { self.get_num_writers() != 0 }
 }
 
 impl<'a, T> SyncEventWriter<'a, T>
@@ -295,18 +313,19 @@ impl<'a, T> SyncEventReader<'a, T>
 	/// for a descripion of the behaviour regarding flushing.
 	pub fn flush_channel(&self) { self.channel.flush(); }
 
-	/// Waits for un-flushed events to be present
+	/// Waits for un-flushed events to be present, returns number of active
+	/// writers
 	///
 	/// If there already are un-flushed events, this returns directly,
 	/// as there are new events that can be flushed.
 	///
 	/// If no events are present, the thread will halt and wake when the
 	/// next [`SyncEventWriter::send`] occurs.
-	pub fn wait_new(&self)
+	pub fn wait_new(&self) -> usize
 	{
 		let _lock = self.channel.write_mutex.lock();
 		if self.channel.has_new_events() {
-			return;
+			return self.channel.get_num_writers();
 		}
 
 		unsafe {
@@ -315,16 +334,17 @@ impl<'a, T> SyncEventReader<'a, T>
 			drop(_lock);
 			p.park();
 		}
+		self.channel.get_num_writers()
 	}
 
 	/// Waits for un-flushed events to be present
 	///
 	/// Like [`wait_new`](SyncEventReader::wait_new), with a timeout in ms
-	pub fn wait_new_timeout(&self, timeout_ms: u64)
+	pub fn wait_new_timeout(&self, timeout_ms: u64) -> usize
 	{
 		let _lock = self.channel.write_mutex.lock();
 		if self.channel.has_new_events() {
-			return;
+			return self.channel.get_num_writers();
 		}
 
 		unsafe {
@@ -333,6 +353,7 @@ impl<'a, T> SyncEventReader<'a, T>
 			drop(_lock);
 			p.park_timeout(Duration::from_millis(timeout_ms));
 		}
+		self.channel.get_num_writers()
 	}
 
 	/// Waits for flushed un-read events to be present
@@ -344,7 +365,8 @@ impl<'a, T> SyncEventReader<'a, T>
 	/// next [`SyncEventChannel::flush`] occurs.
 	///
 	/// Note: This may lead to a deadlock if this thread is responsible for
-	/// flushing, but you already knew that.
+	/// flushing, but you already knew that. Also, note that it does not return
+	/// number of writers, unlike [`wait_new`](SyncEventReader::wait_new)
 	pub fn wait_flushed(&self)
 	{
 		let _lock = self.channel.flush_mutex.write();
