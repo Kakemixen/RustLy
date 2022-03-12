@@ -321,6 +321,8 @@ impl<'a, T> SyncEventReader<'a, T>
 	///
 	/// If no events are present, the thread will halt and wake when the
 	/// next [`SyncEventWriter::send`] occurs.
+	/// If the last writers is dropped, the reader will be woken, so that this
+	/// case may be handled differently.
 	pub fn wait_new(&self) -> usize
 	{
 		let _lock = self.channel.write_mutex.lock();
@@ -363,6 +365,8 @@ impl<'a, T> SyncEventReader<'a, T>
 	///
 	/// If the reader has read current events, it will halt and wake when the
 	/// next [`SyncEventChannel::flush`] occurs.
+	/// If the last writers is dropped, the reader will be woken, so that this
+	/// case may be handled differently.
 	///
 	/// Note: This may lead to a deadlock if this thread is responsible for
 	/// flushing, but you already knew that. Also, note that it does not return
