@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ly_app::{AppInfo, AppState, World};
+use ly_events::channel::wait_any_new;
 use ly_events::channel::wait_any_new_timeout;
 use rustly::app::App;
 use rustly::events::channel::EventWaiter;
@@ -23,6 +24,9 @@ fn main()
 		.unwrap();
 	app.world
 		.create_resource::<SyncEventChannel<MouseEvent>>()
+		.unwrap();
+	app.world
+		.create_resource::<SyncEventChannel<WindowEvent>>()
 		.unwrap();
 	app.world.create_resource::<AtomicUsize>().unwrap();
 
@@ -61,7 +65,8 @@ fn thing_i_want_to_do(world: &World)
 		//reader_b.wait_new();
 
 		debug!("waiting...");
-		wait_any_new_timeout(&arr, 500);
+		//wait_any_new_timeout(&arr, 500);
+		wait_any_new(&arr);
 		if let AppState::Stopped = world.get_resource::<AppInfo>().unwrap().state() {
 			info!("Application quit, breaking read loop!");
 			break;

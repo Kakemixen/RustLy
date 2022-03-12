@@ -119,14 +119,18 @@ fn accumulate_wakers(waiters: &[&dyn EventWaiter]) -> usize
 /// If any channels has unread events, it will return directly, without waiting
 pub fn wait_any_new(readers: &[&dyn EventWaiter]) -> usize
 {
-	let p = Parker::new();
-	for reader in readers {
-		if reader.add_unparker_new(&p).is_err() {
-			return accumulate_wakers(readers);
+	let mut wakers = 1;
+	while wakers != 0 {
+		let p = Parker::new();
+		for reader in readers {
+			if reader.add_unparker_new(&p).is_err() {
+				return accumulate_wakers(readers);
+			}
 		}
+		p.park_timeout(Duration::from_secs(2));
+		wakers = accumulate_wakers(readers);
 	}
-	p.park();
-	accumulate_wakers(readers)
+	wakers
 }
 
 /// Like [`wait_any_new`], but with a timeout in ms
@@ -325,18 +329,25 @@ impl<'a, T> SyncEventReader<'a, T>
 	/// case may be handled differently.
 	pub fn wait_new(&self) -> usize
 	{
-		let _lock = self.channel.write_mutex.lock();
-		if self.channel.has_new_events() {
-			return self.channel.get_num_writers();
-		}
+		let mut i = 0;
+		loop {
+			let _lock = self.channel.write_mutex.lock();
+			if self.channel.has_new_events() {
+				return self.channel.get_num_writers();
+			}
 
-		unsafe {
-			let p = Parker::new();
-			event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), &p);
-			drop(_lock);
-			p.park();
+			if i > 0 && !self.channel_has_writers() {
+				return 0;
+			}
+
+			unsafe {
+				let p = Parker::new();
+				event_signal::add_waiter(&mut *self.channel.new_event_waiters.get(), &p);
+				drop(_lock);
+				p.park_timeout(Duration::from_secs(2));
+			}
+			i += 1;
 		}
-		self.channel.get_num_writers()
 	}
 
 	/// Waits for un-flushed events to be present
