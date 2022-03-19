@@ -3,6 +3,7 @@
 mod winit_converters;
 use std::error::Error;
 
+use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use winit_converters as converters;
 
 use ly_app::{App, AppRunner};
@@ -26,7 +27,6 @@ pub trait EventHandler = FnMut(event::Event<'_, ()>, &EventLoopWindowTarget<()>,
 pub struct LyWindow
 {
 	event_loop: EventLoop<()>,
-	#[allow(dead_code)]
 	window: Window,
 }
 
@@ -71,6 +71,12 @@ impl LyWindow
 		};
 		Box::new(closure)
 	}
+
+	/// Get the RawWindowHandle of the underlying window
+	pub fn get_raw_handle(&self) -> RawWindowHandle { self.window.raw_window_handle() }
+
+	/// Get the winit window handle of the underlying window
+	pub fn get_handle(&self) -> &Window { &self.window }
 }
 
 pub fn get_empty_event_loop() -> Box<dyn EventHandler>

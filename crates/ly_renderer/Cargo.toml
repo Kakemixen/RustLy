@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ash = "0.30.0"
-ash-window = "0.9.1"
+ash = { version = "0.36.0", features = ["linked"] }
 raw-window-handle = "0.4.2"
+scopeguard = "1.1.0"
+
+ly_log = { path = "../ly_log" }

@@ -20,4 +20,7 @@ ly_window = { path = "crates/ly_window" }
 name = "hello_world"
 
 [[example]]
+name = "render_test"
+
+[[example]]
 name = "profile_events"

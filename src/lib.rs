@@ -60,6 +60,14 @@ pub mod input
 	pub use ly_input::*;
 }
 
+/// Renderer for LY engine
+///
+/// crate doc: [ly_renderer]
+pub mod renderer
+{
+	pub use ly_renderer::*;
+}
+
 /// Window abstraction for LY engine clients
 ///
 /// crate doc: [ly_window]
