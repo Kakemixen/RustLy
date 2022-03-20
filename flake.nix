@@ -5,15 +5,21 @@
     nixpkgs.url      = github:nixos/nixpkgs/nixos-unstable;
     rust-overlay.url = github:oxalica/rust-overlay?rev=d480bb17451c57cf4ef67a14f6772f752ced382c;
     flake-utils.url  = github:numtide/flake-utils;
-    nixgl.url        = github:guibou/nixGL;
+    nixgl.url        = github:kakemixen/nixGL;
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, nixgl }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = [ (import rust-overlay) ];
+        overlays = [
+          (import rust-overlay)
+          nixgl.overlay
+        ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          config.allowUnfreePredicate = pkg: builtins.elem (pkgs.lib.getName pkg) [
+            "nvidia"
+          ];
         };
         rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
           extensions = [
@@ -43,6 +49,7 @@
 
             which
             gdb
+            pkgs.nixgl.auto.nixVulkanNvidia # speficy to use overlay
           ];
 
           VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
